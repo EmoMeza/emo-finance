@@ -171,13 +171,20 @@ Resultado: La app me muestra si es realista o debo ajustar
 - [x] CRUD de plantillas (create, read, update, delete, toggle)
 - [x] Cálculo automático de líquido
 
-### 🚧 En Desarrollo (v0.2 - Endpoints API)
-- [ ] Endpoints de períodos
-- [ ] Endpoints de categorías
-- [ ] Endpoints de gastos
-- [ ] Endpoints de plantillas
+### ✅ Completado (v0.2 - Endpoints API)
+- [x] Endpoints de períodos (create, read, update, delete, close, get active)
+- [x] Endpoints de categorías (create, read, update, delete, init defaults)
+- [x] Endpoints de gastos (create, read, update, delete, mark as paid)
+- [x] Endpoints de plantillas (create, read, update, delete, toggle)
+- [x] Validaciones de negocio (suma de metas, períodos activos, etc.)
+- [x] Documentación automática (Swagger/OpenAPI)
+
+### 🚧 En Desarrollo (v0.3 - Frontend Integration)
+- [ ] Services de Angular para cada entidad
 - [ ] Dashboard con las 4 categorías (frontend)
-- [ ] Integración frontend-backend
+- [ ] Componente de creación de períodos
+- [ ] Componente de registro de gastos
+- [ ] Integración completa frontend-backend
 
 ### 📋 Roadmap Futuro
 
@@ -239,15 +246,27 @@ emo-finance/
 ├── backend/                      # API FastAPI
 │   ├── app/
 │   │   ├── api/v1/endpoints/    # Endpoints de la API
-│   │   │   └── auth.py         # Autenticación (login/register)
+│   │   │   ├── auth.py         # Autenticación (login/register)
+│   │   │   ├── periods.py      # Gestión de períodos
+│   │   │   ├── categories.py   # Gestión de categorías
+│   │   │   ├── expenses.py     # Gestión de gastos
+│   │   │   └── expense_templates.py  # Plantillas de gastos fijos
 │   │   ├── core/               # Configuración y utilidades
 │   │   │   ├── config.py       # Variables de entorno
 │   │   │   ├── database.py     # Conexión a MongoDB
 │   │   │   └── security.py     # JWT, hashing
 │   │   ├── crud/               # Operaciones de base de datos
-│   │   │   └── user.py
+│   │   │   ├── user.py
+│   │   │   ├── period.py       # CRUD de períodos
+│   │   │   ├── category.py     # CRUD de categorías
+│   │   │   ├── expense.py      # CRUD de gastos
+│   │   │   └── expense_template.py  # CRUD de plantillas
 │   │   ├── models/             # Modelos Pydantic
-│   │   │   └── user.py
+│   │   │   ├── user.py
+│   │   │   ├── period.py       # Modelo de períodos
+│   │   │   ├── category.py     # Modelo de categorías
+│   │   │   ├── expense.py      # Modelo de gastos
+│   │   │   └── expense_template.py  # Modelo de plantillas
 │   │   └── schemas/            # Schemas de request/response
 │   │       └── auth.py
 │   └── requirements.txt
