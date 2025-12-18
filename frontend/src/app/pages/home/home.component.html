@@ -1,0 +1,62 @@
+<div class="home-container">
+  <div class="welcome-section">
+    <h1>Bienvenido a Emo Finance</h1>
+    @if (authService.currentUser()) {
+      <p class="welcome-text">
+        Hola, <strong>{{ authService.currentUser()?.email }}</strong>
+      </p>
+    }
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="card">
+      <div class="card-icon">💵</div>
+      <h3>Balance Total</h3>
+      <p class="amount">$0.00</p>
+      <span class="card-label">Disponible</span>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">📈</div>
+      <h3>Ingresos</h3>
+      <p class="amount positive">+$0.00</p>
+      <span class="card-label">Este mes</span>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">📉</div>
+      <h3>Gastos</h3>
+      <p class="amount negative">-$0.00</p>
+      <span class="card-label">Este mes</span>
+    </div>
+
+    <div class="card">
+      <div class="card-icon">🎯</div>
+      <h3>Ahorros</h3>
+      <p class="amount">$0.00</p>
+      <span class="card-label">Meta: $0.00</span>
+    </div>
+  </div>
+
+  <div class="quick-actions">
+    <h2>Acciones Rápidas</h2>
+    <div class="actions-grid">
+      <button class="action-btn">
+        <span class="action-icon">➕</span>
+        <span>Nuevo Ingreso</span>
+      </button>
+      <button class="action-btn">
+        <span class="action-icon">➖</span>
+        <span>Nuevo Gasto</span>
+      </button>
+      <button class="action-btn">
+        <span class="action-icon">📊</span>
+        <span>Ver Reportes</span>
+      </button>
+      <button class="action-btn">
+        <span class="action-icon">⚙️</span>
+        <span>Configuración</span>
+      </button>
+    </div>
+  </div>
+</div>

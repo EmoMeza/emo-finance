@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     ]
 
     # MongoDB
-    MONGO_URI: str = "mongodb://mongodb:27017"
+    MONGO_URI: str = "mongodb://localhost:27017"
     MONGO_DB_NAME: str = "emo_finance"
 
     # JWT

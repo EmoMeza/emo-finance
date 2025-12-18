@@ -1,0 +1,85 @@
+<div class="profile-container">
+  <div class="profile-header">
+    <div class="profile-avatar">
+      <span class="avatar-icon">👤</span>
+    </div>
+    <h1>Mi Perfil</h1>
+  </div>
+
+  @if (authService.currentUser()) {
+    <div class="profile-content">
+      <div class="profile-section">
+        <h2>Información Personal</h2>
+        <div class="info-grid">
+          <div class="info-item">
+            <label>Email</label>
+            <p>{{ authService.currentUser()?.email }}</p>
+          </div>
+
+          <div class="info-item">
+            <label>ID de Usuario</label>
+            <p class="text-muted">{{ authService.currentUser()?._id }}</p>
+          </div>
+
+          <div class="info-item">
+            <label>Estado</label>
+            @if (authService.currentUser()?.is_active) {
+              <span class="badge badge-success">Activo</span>
+            } @else {
+              <span class="badge badge-danger">Inactivo</span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-section">
+        <h2>Acciones de Cuenta</h2>
+        <div class="actions-list">
+          <button class="action-item">
+            <span class="action-icon">✏️</span>
+            <div class="action-content">
+              <h3>Editar Perfil</h3>
+              <p>Actualiza tu información personal</p>
+            </div>
+            <span class="action-arrow">›</span>
+          </button>
+
+          <button class="action-item">
+            <span class="action-icon">🔒</span>
+            <div class="action-content">
+              <h3>Cambiar Contraseña</h3>
+              <p>Actualiza tu contraseña de acceso</p>
+            </div>
+            <span class="action-arrow">›</span>
+          </button>
+
+          <button class="action-item">
+            <span class="action-icon">🔔</span>
+            <div class="action-content">
+              <h3>Notificaciones</h3>
+              <p>Configura tus preferencias de notificaciones</p>
+            </div>
+            <span class="action-arrow">›</span>
+          </button>
+
+          <button class="action-item">
+            <span class="action-icon">🌙</span>
+            <div class="action-content">
+              <h3>Tema</h3>
+              <p>Cambia entre modo claro y oscuro</p>
+            </div>
+            <span class="action-arrow">›</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="profile-section danger-zone">
+        <h2>Zona Peligrosa</h2>
+        <button class="btn-danger">
+          <span class="action-icon">⚠️</span>
+          <span>Eliminar Cuenta</span>
+        </button>
+      </div>
+    </div>
+  }
+</div>

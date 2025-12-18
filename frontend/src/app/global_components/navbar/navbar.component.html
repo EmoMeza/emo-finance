@@ -1,0 +1,69 @@
+<nav class="navbar">
+  <div class="navbar-container">
+    <!-- Logo/Brand -->
+    <div class="navbar-brand">
+      <a routerLink="/home" (click)="closeMenu()">
+        <span class="brand-icon">💰</span>
+        <span class="brand-text">Emo Finance</span>
+      </a>
+    </div>
+
+    <!-- Mobile Menu Toggle -->
+    <button
+      class="menu-toggle"
+      (click)="toggleMenu()"
+      [attr.aria-expanded]="isMenuOpen()"
+      aria-label="Toggle menu"
+    >
+      <span class="hamburger" [class.open]="isMenuOpen()">
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
+    </button>
+
+    <!-- Navigation Links -->
+    <div class="navbar-menu" [class.active]="isMenuOpen()">
+      @if (authService.isAuthenticated()) {
+        <div class="nav-links">
+          <a
+            routerLink="/home"
+            routerLinkActive="active"
+            (click)="closeMenu()"
+            class="nav-link"
+          >
+            <span class="nav-icon">🏠</span>
+            <span>Inicio</span>
+          </a>
+
+          <a
+            routerLink="/profile"
+            routerLinkActive="active"
+            (click)="closeMenu()"
+            class="nav-link"
+          >
+            <span class="nav-icon">👤</span>
+            <span>Perfil</span>
+          </a>
+        </div>
+
+        <div class="nav-actions">
+          @if (authService.currentUser()) {
+            <div class="user-info">
+              <span class="user-email">{{ authService.currentUser()?.email }}</span>
+            </div>
+          }
+          <button class="btn-logout" (click)="logout()">
+            <span class="nav-icon">🚪</span>
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      }
+    </div>
+  </div>
+</nav>
+
+<!-- Overlay for mobile menu -->
+@if (isMenuOpen()) {
+  <div class="menu-overlay" (click)="closeMenu()"></div>
+}
