@@ -18,7 +18,9 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DOCS_ENABLED else None,
+    docs_url="/docs" if settings.DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.DOCS_ENABLED else None,
     lifespan=lifespan
 )
 
@@ -37,11 +39,14 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
-    return {
+    response = {
         "message": "Welcome to Emo Finance API",
         "version": settings.VERSION,
-        "docs": f"{settings.API_V1_STR}/docs"
+        "environment": settings.ENVIRONMENT
     }
+    if settings.DOCS_ENABLED:
+        response["docs"] = "/docs"
+    return response
 
 
 @app.get("/health")
