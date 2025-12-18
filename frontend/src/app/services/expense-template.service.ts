@@ -2,7 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { MetodoPago } from './expense.service';
-import { environment } from '../../../environments/environment';
+import { environment } from '../../environments/environment';
 
 export interface ExpenseTemplate {
   _id: string;
