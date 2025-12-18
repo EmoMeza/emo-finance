@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: emo-finance-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: emo_finance
+    networks:
+      - emo-finance-network
+
+  # # Backend API (FastAPI)
+  # backend:
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: emo-finance-backend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./backend/app:/app/app
+  #   environment:
+  #     - MONGO_URI=mongodb://mongodb:27017
+  #     - MONGO_DB_NAME=emo_finance
+  #     - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
+  #     - ALGORITHM=HS256
+  #     - ACCESS_TOKEN_EXPIRE_MINUTES=30
+  #   depends_on:
+  #     - mongodb
+  #   networks:
+  #     - emo-finance-network
+
+  # # Frontend (Angular)
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: emo-finance-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "4200:80"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - emo-finance-network
+
+volumes:
+  mongodb_data:
+    driver: local
+
+networks:
+  emo-finance-network:
+    driver: bridge
