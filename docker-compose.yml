@@ -15,41 +15,41 @@ services:
     networks:
       - emo-finance-network
 
-  # # Backend API (FastAPI)
-  # backend:
-  #   build:
-  #     context: ./backend
-  #     dockerfile: Dockerfile
-  #   container_name: emo-finance-backend
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8000:8000"
-  #   volumes:
-  #     - ./backend/app:/app/app
-  #   environment:
-  #     - MONGO_URI=mongodb://mongodb:27017
-  #     - MONGO_DB_NAME=emo_finance
-  #     - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
-  #     - ALGORITHM=HS256
-  #     - ACCESS_TOKEN_EXPIRE_MINUTES=30
-  #   depends_on:
-  #     - mongodb
-  #   networks:
-  #     - emo-finance-network
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: emo-finance-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DB_NAME=emo_finance
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-this}
+      - ALGORITHM=HS256
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+    depends_on:
+      - mongodb
+    networks:
+      - emo-finance-network
 
-  # # Frontend (Angular)
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: emo-finance-frontend
-  #   restart: unless-stopped
-  #   ports:
-  #     - "4200:80"
-  #   depends_on:
-  #     - backend
-  #   networks:
-  #     - emo-finance-network
+  # Frontend (Angular)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: emo-finance-frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+    depends_on:
+      - backend
+    networks:
+      - emo-finance-network
 
 volumes:
   mongodb_data:
