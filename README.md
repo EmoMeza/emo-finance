@@ -160,15 +160,24 @@ Resultado: La app me muestra si es realista o debo ajustar
 - [x] Páginas: Login, Home, Profile
 - [x] Estructura de carpetas organizada (pages, services, guards, global_components)
 
-### 🚧 En Desarrollo (v0.2 - Core Financiero)
-- [ ] Modelo de datos: Períodos
-- [ ] Modelo de datos: Categorías
-- [ ] Modelo de datos: Gastos
-- [ ] Modelo de datos: Plantillas de gastos fijos
-- [ ] CRUD de períodos
-- [ ] CRUD de gastos
-- [ ] Dashboard con las 4 categorías
-- [ ] Cálculo automático de líquido
+### ✅ Completado (v0.2 - Core Financiero - Modelos y CRUD)
+- [x] Modelo de datos: Períodos
+- [x] Modelo de datos: Categorías
+- [x] Modelo de datos: Gastos
+- [x] Modelo de datos: Plantillas de gastos fijos
+- [x] CRUD de períodos (create, read, update, delete, close)
+- [x] CRUD de categorías (create, read, update, delete, init defaults)
+- [x] CRUD de gastos (create, read, update, delete, mark as paid)
+- [x] CRUD de plantillas (create, read, update, delete, toggle)
+- [x] Cálculo automático de líquido
+
+### 🚧 En Desarrollo (v0.2 - Endpoints API)
+- [ ] Endpoints de períodos
+- [ ] Endpoints de categorías
+- [ ] Endpoints de gastos
+- [ ] Endpoints de plantillas
+- [ ] Dashboard con las 4 categorías (frontend)
+- [ ] Integración frontend-backend
 
 ### 📋 Roadmap Futuro
 
