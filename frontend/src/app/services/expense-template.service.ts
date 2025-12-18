@@ -2,6 +2,7 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { MetodoPago } from './expense.service';
+import { environment } from '../../../environments/environment';
 
 export interface ExpenseTemplate {
   _id: string;
@@ -43,7 +44,7 @@ export interface ExpenseTemplateUpdate {
   providedIn: 'root'
 })
 export class ExpenseTemplateService {
-  private readonly API_URL = 'http://localhost:8000/api/v1';
+  private readonly API_URL = environment.apiUrl;
 
   // Signals
   templates = signal<ExpenseTemplate[]>([]);

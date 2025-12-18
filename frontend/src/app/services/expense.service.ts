@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export enum TipoGasto {
   FIJO = 'fijo',
@@ -66,7 +67,7 @@ export interface ExpenseUpdate {
   providedIn: 'root'
 })
 export class ExpenseService {
-  private readonly API_URL = 'http://localhost:8000/api/v1';
+  private readonly API_URL = environment.apiUrl;
 
   // Signals
   expenses = signal<Expense[]>([]);

@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../../environments/environment';
 
 export enum TipoCategoria {
   AHORRO = 'ahorro',
@@ -46,7 +47,7 @@ export interface CategoryUpdate {
   providedIn: 'root'
 })
 export class CategoryService {
-  private readonly API_URL = 'http://localhost:8000/api/v1';
+  private readonly API_URL = environment.apiUrl;
 
   // Signals para categorías
   categories = signal<Category[]>([]);
