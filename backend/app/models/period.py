@@ -57,7 +57,7 @@ class PeriodBase(BaseModel):
     tipo_periodo: TipoPeriodo = Field(..., description="Tipo de período (mensual o ciclo crédito)")
     fecha_inicio: datetime = Field(..., description="Fecha de inicio del período")
     fecha_fin: datetime = Field(..., description="Fecha de fin del período")
-    sueldo: float = Field(..., gt=0, description="Sueldo o ingreso total del período")
+    sueldo: float = Field(..., ge=0, description="Sueldo o ingreso total del período")
     metas_categorias: MetasCategorias = Field(..., description="Metas de asignación por categoría")
     estado: EstadoPeriodo = Field(default=EstadoPeriodo.ACTIVO, description="Estado del período")
 
@@ -66,13 +66,6 @@ class PeriodBase(BaseModel):
     def validate_dates(cls, v, info):
         if 'fecha_inicio' in info.data and v <= info.data['fecha_inicio']:
             raise ValueError('fecha_fin debe ser posterior a fecha_inicio')
-        return v
-
-    @field_validator('sueldo')
-    @classmethod
-    def validate_sueldo(cls, v):
-        if v <= 0:
-            raise ValueError('El sueldo debe ser mayor a 0')
         return v
 
 
@@ -86,6 +79,13 @@ class PeriodUpdate(BaseModel):
     sueldo: Optional[float] = Field(None, gt=0)
     metas_categorias: Optional[MetasCategorias] = None
     estado: Optional[EstadoPeriodo] = None
+
+    @field_validator('sueldo')
+    @classmethod
+    def validate_sueldo_update(cls, v):
+        if v is not None and v <= 0:
+            raise ValueError('El sueldo debe ser mayor a 0 al actualizar')
+        return v
 
 
 class PeriodInDB(PeriodBase):

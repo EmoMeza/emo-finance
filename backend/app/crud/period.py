@@ -1,14 +1,15 @@
 from typing import Optional, List
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
-from datetime import datetime
+from datetime import datetime, date
 
 from app.models.period import (
     PeriodCreate,
     PeriodUpdate,
     PeriodInDB,
     EstadoPeriodo,
-    TipoPeriodo
+    TipoPeriodo,
+    MetasCategorias
 )
 
 
@@ -38,7 +39,7 @@ class PeriodCRUD:
         return PeriodInDB(**period) if period else None
 
     async def get_active_period(self, user_id: str, tipo_periodo: Optional[TipoPeriodo] = None) -> Optional[PeriodInDB]:
-        """Obtener el período activo del usuario"""
+        """Obtener el período activo del usuario, creándolo automáticamente si no existe"""
         query = {
             "user_id": ObjectId(user_id),
             "estado": EstadoPeriodo.ACTIVO
@@ -48,7 +49,66 @@ class PeriodCRUD:
             query["tipo_periodo"] = tipo_periodo
 
         period = await self.collection.find_one(query)
+
+        # Si no existe período activo, crear uno automáticamente
+        if not period:
+            period = await self._create_current_period(user_id, tipo_periodo or TipoPeriodo.MENSUAL_ESTANDAR)
+
         return PeriodInDB(**period) if period else None
+
+    async def _create_current_period(self, user_id: str, tipo_periodo: TipoPeriodo) -> dict:
+        """Crear automáticamente el período del mes/ciclo actual con valores en 0"""
+        from datetime import timedelta
+        today = date.today()
+
+        if tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
+            # Período mensual estándar: día 1 al último día del mes
+            fecha_inicio = datetime(today.year, today.month, 1, 0, 0, 0)
+            # Calcular último día del mes
+            if today.month == 12:
+                fecha_fin = datetime(today.year, 12, 31, 23, 59, 59)
+            else:
+                next_month = datetime(today.year, today.month + 1, 1, 0, 0, 0)
+                fecha_fin = next_month - timedelta(seconds=1)
+        else:
+            # Período de crédito: día 25 del mes anterior al 24 del mes actual
+            if today.day >= 25:
+                # Si estamos después del día 25, el período va del 25 de este mes al 24 del siguiente
+                fecha_inicio = datetime(today.year, today.month, 25, 0, 0, 0)
+                if today.month == 12:
+                    fecha_fin = datetime(today.year + 1, 1, 24, 23, 59, 59)
+                else:
+                    fecha_fin = datetime(today.year, today.month + 1, 24, 23, 59, 59)
+            else:
+                # Si estamos antes del día 25, el período va del 25 del mes pasado al 24 de este mes
+                if today.month == 1:
+                    fecha_inicio = datetime(today.year - 1, 12, 25, 0, 0, 0)
+                else:
+                    fecha_inicio = datetime(today.year, today.month - 1, 25, 0, 0, 0)
+                fecha_fin = datetime(today.year, today.month, 24, 23, 59, 59)
+
+        # Crear período directamente como dict para evitar validaciones de Pydantic
+        # (permitimos sueldo = 0 para períodos sin configurar)
+        period_dict = {
+            "tipo_periodo": tipo_periodo,
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "sueldo": 0,  # Se permite 0 en la creación automática
+            "metas_categorias": {
+                "ahorro": 0,
+                "arriendo": 0,
+                "credito_usable": 0
+            },
+            "estado": EstadoPeriodo.ACTIVO,
+            "user_id": ObjectId(user_id),
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
+
+        result = await self.collection.insert_one(period_dict)
+        period_dict["_id"] = result.inserted_id
+
+        return period_dict
 
     async def get_all(
         self,

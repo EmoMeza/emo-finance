@@ -179,12 +179,23 @@ Resultado: La app me muestra si es realista o debo ajustar
 - [x] Validaciones de negocio (suma de metas, períodos activos, etc.)
 - [x] Documentación automática (Swagger/OpenAPI)
 
-### 🚧 En Desarrollo (v0.3 - Frontend Integration)
-- [ ] Services de Angular para cada entidad
-- [ ] Dashboard con las 4 categorías (frontend)
+### ✅ Completado (v0.3 - Frontend Services & Dashboard)
+- [x] Period service con signals reactivos
+- [x] Category service con inicialización de defaults
+- [x] Expense service con filtros y cálculos
+- [x] ExpenseTemplate service con toggle activo/inactivo
+- [x] Dashboard principal con visualización de las 4 categorías
+- [x] Indicadores en tiempo real (ahorro, arriendo, crédito, líquido)
+- [x] Barras de progreso por categoría
+- [x] Manejo de estados (loading, error, sin período)
+- [x] Formato de moneda chileno (CLP)
+
+### 🚧 En Desarrollo (v0.4 - CRUD Components)
 - [ ] Componente de creación de períodos
 - [ ] Componente de registro de gastos
-- [ ] Integración completa frontend-backend
+- [ ] Componente de gestión de plantillas
+- [ ] Simulador de presupuesto interactivo
+- [ ] Integración completa end-to-end
 
 ### 📋 Roadmap Futuro
 

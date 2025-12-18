@@ -1,62 +1,233 @@
 <div class="home-container">
-  <div class="welcome-section">
-    <h1>Bienvenido a Emo Finance</h1>
-    @if (authService.currentUser()) {
-      <p class="welcome-text">
-        Hola, <strong>{{ authService.currentUser()?.email }}</strong>
-      </p>
-    }
-  </div>
-
-  <div class="dashboard-grid">
-    <div class="card">
-      <div class="card-icon">💵</div>
-      <h3>Balance Total</h3>
-      <p class="amount">$0.00</p>
-      <span class="card-label">Disponible</span>
+  @if (isLoading()) {
+    <div class="loading-state">
+      <div class="spinner-large"></div>
+      <!-- <p>Cargando dashboard...</p> -->
     </div>
-
-    <div class="card">
-      <div class="card-icon">📈</div>
-      <h3>Ingresos</h3>
-      <p class="amount positive">+$0.00</p>
-      <span class="card-label">Este mes</span>
-    </div>
-
-    <div class="card">
-      <div class="card-icon">📉</div>
-      <h3>Gastos</h3>
-      <p class="amount negative">-$0.00</p>
-      <span class="card-label">Este mes</span>
-    </div>
-
-    <div class="card">
-      <div class="card-icon">🎯</div>
-      <h3>Ahorros</h3>
-      <p class="amount">$0.00</p>
-      <span class="card-label">Meta: $0.00</span>
-    </div>
-  </div>
-
-  <div class="quick-actions">
-    <h2>Acciones Rápidas</h2>
-    <div class="actions-grid">
-      <button class="action-btn">
-        <span class="action-icon">➕</span>
-        <span>Nuevo Ingreso</span>
-      </button>
-      <button class="action-btn">
-        <span class="action-icon">➖</span>
-        <span>Nuevo Gasto</span>
-      </button>
-      <button class="action-btn">
-        <span class="action-icon">📊</span>
-        <span>Ver Reportes</span>
-      </button>
-      <button class="action-btn">
-        <span class="action-icon">⚙️</span>
-        <span>Configuración</span>
+  } @else if (error()) {
+    <div class="error-state">
+      <div class="error-icon">⚠️</div>
+      <h2>Error al cargar el dashboard</h2>
+      <p>{{ error() }}</p>
+      <button class="btn-secondary" (click)="loadDashboardData()">
+        Reintentar
       </button>
     </div>
-  </div>
+  } @else {
+    <!-- Header con sueldo total -->
+    <div class="dashboard-header">
+      <div class="sueldo-section">
+        <span class="label">Sueldo del Período</span>
+        <h1 class="sueldo-amount">{{ formatCurrency(sueldo()) }}</h1>
+      </div>
+      @if (isPeriodUnconfigured()) {
+        <div class="config-alert">
+          <span class="alert-icon">⚠️</span>
+          <span>Período sin configurar</span>
+          <button class="btn-config" (click)="openConfigModal()">Configurar</button>
+        </div>
+      } @else {
+        <button class="btn-edit" (click)="openConfigModal()">
+          <span>✏️</span>
+          Editar Período
+        </button>
+      }
+    </div>
+
+    <!-- Grid de 4 categorías -->
+    <div class="categories-grid">
+      <!-- Ahorro -->
+      <div class="category-card ahorro">
+        <div class="card-header">
+          <span class="card-icon">{{ ahorroCategory()?.icono || '💵' }}</span>
+          <h3>{{ ahorroCategory()?.nombre || 'Ahorro' }}</h3>
+        </div>
+        <div class="card-content">
+          <p class="amount">{{ formatCurrency(ahorro()) }}</p>
+          <div class="progress-bar">
+            <div class="progress-fill ahorro-fill" [style.width.%]="porcentajeAhorro()"></div>
+          </div>
+          <span class="percentage">{{ porcentajeAhorro() }}% del sueldo</span>
+        </div>
+      </div>
+
+      <!-- Arriendo -->
+      <div class="category-card arriendo">
+        <div class="card-header">
+          <span class="card-icon">{{ arriendoCategory()?.icono || '🏠' }}</span>
+          <h3>{{ arriendoCategory()?.nombre || 'Arriendo' }}</h3>
+        </div>
+        <div class="card-content">
+          <p class="amount">{{ formatCurrency(arriendo()) }}</p>
+          <div class="progress-bar">
+            <div class="progress-fill arriendo-fill" [style.width.%]="porcentajeArriendo()"></div>
+          </div>
+          <span class="percentage">{{ porcentajeArriendo() }}% del sueldo</span>
+        </div>
+      </div>
+
+      <!-- Crédito Usable -->
+      <div class="category-card credito">
+        <div class="card-header">
+          <span class="card-icon">{{ creditoCategory()?.icono || '💳' }}</span>
+          <h3>{{ creditoCategory()?.nombre || 'Crédito' }}</h3>
+        </div>
+        <div class="card-content">
+          <p class="amount">{{ formatCurrency(creditoUsable()) }}</p>
+          <div class="progress-bar">
+            <div class="progress-fill credito-fill" [style.width.%]="porcentajeCredito()"></div>
+          </div>
+          <span class="percentage">{{ porcentajeCredito() }}% del sueldo</span>
+        </div>
+      </div>
+
+      <!-- Líquido (Calculado) -->
+      <div class="category-card liquido highlight">
+        <div class="card-header">
+          <span class="card-icon">{{ liquidoCategory()?.icono || '💸' }}</span>
+          <h3>{{ liquidoCategory()?.nombre || 'Líquido' }}</h3>
+          <span class="badge">Calculado</span>
+        </div>
+        <div class="card-content">
+          <p class="amount large">{{ formatCurrency(liquido()) }}</p>
+          <div class="progress-bar">
+            <div class="progress-fill liquido-fill" [style.width.%]="porcentajeLiquido()"></div>
+          </div>
+          <span class="percentage">{{ porcentajeLiquido() }}% disponible</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="quick-actions">
+      <h2>Acciones Rápidas</h2>
+      <div class="actions-grid">
+        <button class="action-btn">
+          <span class="action-icon">➕</span>
+          <span>Registrar Gasto</span>
+        </button>
+        <button class="action-btn">
+          <span class="action-icon">📅</span>
+          <span>Ver Períodos</span>
+        </button>
+        <button class="action-btn">
+          <span class="action-icon">🔄</span>
+          <span>Gastos Fijos</span>
+        </button>
+        <button class="action-btn">
+          <span class="action-icon">📊</span>
+          <span>Reportes</span>
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- Modal de Configuración de Período -->
+  @if (showConfigModal()) {
+    <div class="modal-overlay" (click)="closeConfigModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Configurar Período</h2>
+          <button class="btn-close" (click)="closeConfigModal()">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="modal-description">
+            Define tu sueldo y las metas para este período. El líquido se calculará automáticamente.
+          </p>
+
+          <!-- Sueldo -->
+          <div class="form-group">
+            <label for="sueldo">💰 Sueldo del Período</label>
+            <input
+              type="number"
+              id="sueldo"
+              [(ngModel)]="configForm.sueldo"
+              class="form-input"
+              placeholder="Ej: 1500000"
+              min="0"
+            >
+          </div>
+
+          <!-- Ahorro -->
+          <div class="form-group">
+            <label for="ahorro">💵 Meta de Ahorro</label>
+            <input
+              type="number"
+              id="ahorro"
+              [(ngModel)]="configForm.ahorro"
+              class="form-input"
+              placeholder="Ej: 200000"
+              min="0"
+            >
+            <span class="input-hint">
+              {{ calculatePercentagePreview(configForm.ahorro) }}% del sueldo
+            </span>
+          </div>
+
+          <!-- Arriendo -->
+          <div class="form-group">
+            <label for="arriendo">🏠 Presupuesto Arriendo</label>
+            <input
+              type="number"
+              id="arriendo"
+              [(ngModel)]="configForm.arriendo"
+              class="form-input"
+              placeholder="Ej: 400000"
+              min="0"
+            >
+            <span class="input-hint">
+              {{ calculatePercentagePreview(configForm.arriendo) }}% del sueldo
+            </span>
+          </div>
+
+          <!-- Crédito Usable -->
+          <div class="form-group">
+            <label for="credito">💳 Crédito Usable</label>
+            <input
+              type="number"
+              id="credito"
+              [(ngModel)]="configForm.credito"
+              class="form-input"
+              placeholder="Ej: 300000"
+              min="0"
+            >
+            <span class="input-hint">
+              {{ calculatePercentagePreview(configForm.credito) }}% del sueldo
+            </span>
+          </div>
+
+          <!-- Líquido Calculado -->
+          <div class="liquido-preview">
+            <div class="preview-label">💸 Líquido Disponible (Calculado)</div>
+            <div class="preview-amount" [class.negative]="liquidoPreview() < 0">
+              {{ formatCurrency(liquidoPreview()) }}
+            </div>
+            <div class="preview-percentage">
+              {{ calculatePercentagePreview(liquidoPreview()) }}% del sueldo
+            </div>
+          </div>
+
+          @if (liquidoPreview() < 0) {
+            <div class="alert-warning">
+              ⚠️ Las metas superan el sueldo. Ajusta los valores.
+            </div>
+          }
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeConfigModal()">
+            Cancelar
+          </button>
+          <button
+            class="btn-primary"
+            (click)="savePeriodConfig()"
+            [disabled]="configForm.sueldo <= 0 || liquidoPreview() < 0"
+          >
+            Guardar Configuración
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>
