@@ -29,6 +29,7 @@ export interface Period {
   sueldo: number;
   metas_categorias: MetasCategorias;
   estado: EstadoPeriodo;
+  total_gastado: number;
   liquido_calculado: number;
   created_at: string;
   updated_at: string;
@@ -47,6 +48,7 @@ export interface PeriodUpdate {
   sueldo?: number;
   metas_categorias?: MetasCategorias;
   estado?: EstadoPeriodo;
+  total_gastado?: number;
 }
 
 @Injectable({

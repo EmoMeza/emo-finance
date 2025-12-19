@@ -183,7 +183,7 @@
 
           <!-- Crédito Usable -->
           <div class="form-group">
-            <label for="credito">💳 Crédito Usable</label>
+            <label for="credito">💳 Crédito Usable (Este Período)</label>
             <input
               type="number"
               id="credito"
@@ -193,9 +193,27 @@
               min="0"
             >
             <span class="input-hint">
-              {{ calculatePercentagePreview(configForm.credito) }}% del sueldo
+              Límite para el período de crédito actual
             </span>
           </div>
+
+          <!-- Deuda de Crédito Anterior (solo primera vez) -->
+          @if (isFirstTimeSetup()) {
+            <div class="form-group highlight-group">
+              <label for="deudaCredito">🔴 Deuda del Período de Crédito Anterior</label>
+              <input
+                type="number"
+                id="deudaCredito"
+                [(ngModel)]="configForm.deudaCreditoAnterior"
+                class="form-input"
+                placeholder="Ej: 250000"
+                min="0"
+              >
+              <span class="input-hint warning-hint">
+                ⚠️ Cuánto gastaste en tu tarjeta el mes pasado (se restará del líquido)
+              </span>
+            </div>
+          }
 
           <!-- Líquido Calculado -->
           <div class="liquido-preview">

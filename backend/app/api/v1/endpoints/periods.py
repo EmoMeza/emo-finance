@@ -75,6 +75,7 @@ async def create_period(
         sueldo=period.sueldo,
         metas_categorias=period.metas_categorias,
         estado=period.estado,
+        total_gastado=period.total_gastado,
         liquido_calculado=liquido,
         created_at=period.created_at,
         updated_at=period.updated_at
@@ -147,9 +148,17 @@ async def get_active_period(
             detail="No hay período activo"
         )
 
+    # Para períodos mensuales, obtener la deuda del período de crédito anterior
+    deuda_credito_anterior = 0
+    if period.tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
+        previous_credit = await period_crud.get_previous_credit_period(str(current_user.id))
+        if previous_credit:
+            deuda_credito_anterior = previous_credit.total_gastado
+
     liquido = period_crud.calculate_liquido(
         period.sueldo,
-        period.metas_categorias.model_dump()
+        period.metas_categorias.model_dump(),
+        deuda_credito_anterior
     )
 
     return PeriodResponse(
@@ -161,6 +170,7 @@ async def get_active_period(
         sueldo=period.sueldo,
         metas_categorias=period.metas_categorias,
         estado=period.estado,
+        total_gastado=period.total_gastado,
         liquido_calculado=liquido,
         created_at=period.created_at,
         updated_at=period.updated_at
@@ -199,6 +209,7 @@ async def get_period(
         sueldo=period.sueldo,
         metas_categorias=period.metas_categorias,
         estado=period.estado,
+        total_gastado=period.total_gastado,
         liquido_calculado=liquido,
         created_at=period.created_at,
         updated_at=period.updated_at
@@ -271,6 +282,7 @@ async def update_period(
         sueldo=period.sueldo,
         metas_categorias=period.metas_categorias,
         estado=period.estado,
+        total_gastado=period.total_gastado,
         liquido_calculado=liquido,
         created_at=period.created_at,
         updated_at=period.updated_at
@@ -312,6 +324,7 @@ async def close_period(
         sueldo=period.sueldo,
         metas_categorias=period.metas_categorias,
         estado=period.estado,
+        total_gastado=period.total_gastado,
         liquido_calculado=liquido,
         created_at=period.created_at,
         updated_at=period.updated_at

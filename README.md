@@ -50,26 +50,45 @@ Tu Sueldo: $1.500.000
 
 ### 📊 4 Categorías Fundamentales
 
-1. **💵 Ahorro**: Cuánto quieres ahorrar cada mes
-2. **🏠 Arriendo**: Presupuesto para vivienda (arriendo, luz, agua, gas, internet)
-3. **💳 Crédito Usable**: Límite autoimpuesto para tarjeta de crédito
-4. **💸 Líquido**: Dinero disponible en efectivo/transferencia (calculado automáticamente)
+1. **💵 Ahorro**: Meta de ahorro mensual. Puede tener gastos (emergencias) y aportes (ingresos extra)
+2. **🏠 Arriendo**: Presupuesto para vivienda (arriendo, servicios, comida). Puede tener gastos y aportes (de pareja u otros)
+3. **💳 Crédito Usable**: Límite autoimpuesto para tarjeta de crédito. Incluye gastos fijos (suscripciones, cuotas) y variables
+4. **💸 Líquido**: Dinero disponible calculado como: `Sueldo - Ahorro - Arriendo - Crédito Período Anterior`
 
-### 🔄 Gastos Fijos y Variables
+### 🔄 Gastos y Aportes
 
-- **Gastos Fijos**: Se repiten cada mes (Netflix, arriendo, gym)
-  - Se generan automáticamente al inicio del período
-  - Edita el valor del mes sin afectar la plantilla
+- **Gastos Fijos**: Se repiten en el tiempo
+  - **Permanentes**: Se copian cada período hasta desactivarlos (Netflix, arriendo, gym)
+  - **Temporales**: Tienen períodos definidos, se copian hasta terminar (compra en 5 cuotas)
+  - Se copian automáticamente al nuevo período
 
-- **Gastos Variables**: Únicos del período (compras ocasionales)
-  - Registro rápido y simple
-  - Se descuentan al instante de tu presupuesto
+- **Gastos Variables**: Únicos del período actual (compras ocasionales)
+  - Registro rápido durante el mes
+  - No se copian al siguiente período
 
-### 📅 Manejo de Períodos Especiales
+- **Aportes**: Ingresos adicionales que aumentan el presupuesto
+  - **Aportes Fijos**: Se copian cada período (aporte mensual de pareja)
+  - **Aportes Variables**: Únicos del período (venta de artículo, reembolso)
 
-- **Período Mensual**: 1-31 de cada mes (para arriendo, ahorro, líquido)
-- **Período de Crédito**: 25 del mes anterior - 24 del mes actual
-- Ambos funcionan en paralelo automáticamente
+### 📅 Manejo de Períodos Duales
+
+- **Período Mensual**: Día 1 al último día del mes
+  - Gestiona: Ahorro, Arriendo y Liquidez
+  - Se crea automáticamente cada mes
+  - El crédito del período anterior se paga aquí
+
+- **Período de Crédito**: Día 25 del mes anterior al 24 del mes actual
+  - Gestiona: Gastos con tarjeta de crédito
+  - Funciona en paralelo con el período mensual
+  - El total gastado se usa en el próximo período mensual
+
+**Ejemplo de Flujo**:
+```
+Nov 25 - Dic 24: Período Crédito → Gasté $220,000
+Ene 1 - Ene 31: Período Mensual → Resto $220,000 del líquido
+Dic 25 - Ene 24: Período Crédito → Gasté $200,000
+Feb 1 - Feb 28: Período Mensual → Resto $200,000 del líquido
+```
 
 ### 📈 Reportes e Historial
 
@@ -98,9 +117,10 @@ Resultado: Veo que tengo que reducir crédito o arriendo para compensar
 
 ### 3. Control de Gastos de Crédito
 ```
-Situación: Meta de $300k en crédito, gastos fijos son $50k (suscripciones)
-Acción: La app muestra "Disponible: $250k"
-Resultado: Sé exactamente cuánto puedo gastar sin pasarme
+Situación: Meta de $300k en crédito
+Gastos Fijos: Netflix $20k, Spotify $10k, Juego en cuotas $5k
+Acción: La app calcula "Crédito Usable Real: $265k"
+Resultado: Sé exactamente cuánto puedo gastar en variables sin pasarme
 ```
 
 ### 4. Planificación Mensual
@@ -161,77 +181,84 @@ Resultado: La app me muestra si es realista o debo ajustar
 - [x] Estructura de carpetas organizada (pages, services, guards, global_components)
 
 ### ✅ Completado (v0.2 - Core Financiero - Modelos y CRUD)
-- [x] Modelo de datos: Períodos
-- [x] Modelo de datos: Categorías
-- [x] Modelo de datos: Gastos
-- [x] Modelo de datos: Plantillas de gastos fijos
+- [x] Modelo de datos: Períodos (mensual y crédito)
+- [x] Modelo de datos: Categorías (4 principales)
+- [x] Auto-creación de períodos al primer login
 - [x] CRUD de períodos (create, read, update, delete, close)
 - [x] CRUD de categorías (create, read, update, delete, init defaults)
-- [x] CRUD de gastos (create, read, update, delete, mark as paid)
-- [x] CRUD de plantillas (create, read, update, delete, toggle)
-- [x] Cálculo automático de líquido
+- [x] Cálculo automático de líquido (sueldo - ahorro - arriendo - crédito anterior)
 
 ### ✅ Completado (v0.2 - Endpoints API)
 - [x] Endpoints de períodos (create, read, update, delete, close, get active)
 - [x] Endpoints de categorías (create, read, update, delete, init defaults)
-- [x] Endpoints de gastos (create, read, update, delete, mark as paid)
-- [x] Endpoints de plantillas (create, read, update, delete, toggle)
-- [x] Validaciones de negocio (suma de metas, períodos activos, etc.)
+- [x] Validaciones de negocio (períodos activos, etc.)
 - [x] Documentación automática (Swagger/OpenAPI)
 
 ### ✅ Completado (v0.3 - Frontend Services & Dashboard)
 - [x] Period service con signals reactivos
 - [x] Category service con inicialización de defaults
-- [x] Expense service con filtros y cálculos
-- [x] ExpenseTemplate service con toggle activo/inactivo
 - [x] Dashboard principal con visualización de las 4 categorías
 - [x] Indicadores en tiempo real (ahorro, arriendo, crédito, líquido)
 - [x] Barras de progreso por categoría
 - [x] Manejo de estados (loading, error, sin período)
+- [x] Modal de configuración de período (primera vez y edición)
+- [x] Campo especial para crédito anterior (solo primera vez)
+- [x] Cálculo en tiempo real de liquidez en modal
 - [x] Formato de moneda chileno (CLP)
 
-### 🚧 En Desarrollo (v0.4 - CRUD Components)
-- [ ] Componente de creación de períodos
-- [ ] Componente de registro de gastos
-- [ ] Componente de gestión de plantillas
-- [ ] Simulador de presupuesto interactivo
-- [ ] Integración completa end-to-end
+### 🚧 En Desarrollo (v1.0 - Sistema Completo de Gastos y Aportes)
+
+**Objetivo**: Implementar la lógica completa del sistema según [LOGICA_SISTEMA.md](LOGICA_SISTEMA.md)
+
+**Backend**:
+- [ ] Modelo de Gastos (fijos permanentes, fijos temporales, variables)
+- [ ] Modelo de Aportes (fijos y variables)
+- [ ] CRUD de Gastos con tipos y períodos restantes
+- [ ] CRUD de Aportes
+- [ ] Lógica de copia automática de gastos/aportes fijos
+- [ ] Endpoint de desglose de categoría
+- [ ] Actualización de cálculo de liquidez con nueva fórmula
+- [ ] Job para cierre/apertura automática de períodos
+
+**Frontend**:
+- [ ] Vista detallada de categoría (modal con pestañas)
+- [ ] Formulario de agregar gasto fijo (permanente/temporal)
+- [ ] Formulario de agregar gasto variable
+- [ ] Formulario de agregar aporte (fijo/variable)
+- [ ] Visualización de desglose en tarjetas
+- [ ] Indicador de crédito usable real (dinámico)
+- [ ] Actualización de cálculos con gastos y aportes
 
 ### 📋 Roadmap Futuro
 
-**v0.3 - Gastos Fijos**
-- [ ] CRUD de plantillas de gastos recurrentes
-- [ ] Generación automática al inicio de período
-- [ ] Edición de gastos sin afectar plantilla
-- [ ] Vista de calendario de recurrentes
-
-**v0.4 - Simulador**
-- [ ] Simulador interactivo de presupuesto
-- [ ] Sliders para ajustar metas en tiempo real
+**v1.1 - Simulador Interactivo**
+- [ ] Simulador de presupuesto en tiempo real
+- [ ] Sliders para ajustar metas
 - [ ] Visualización del impacto en líquido
 - [ ] Comparación con períodos anteriores
-- [ ] Sugerencias basadas en historial
 
-**v0.5 - Reportes**
+**v1.2 - Reportes y Estadísticas**
 - [ ] Comparación entre períodos
 - [ ] Gráficos de evolución de gastos
 - [ ] Estadísticas de cumplimiento de metas
 - [ ] Proyección de próximo período
 - [ ] Exportación de reportes (PDF/CSV)
+- [ ] Historial completo de períodos cerrados
 
-**v0.6 - UX Avanzada**
+**v1.3 - UX Avanzada**
 - [ ] Alertas inteligentes de presupuesto
 - [ ] Modo oscuro
 - [ ] PWA (Progressive Web App)
-- [ ] Notificaciones push
-- [ ] Onboarding para nuevos usuarios
+- [ ] Notificaciones push (recordatorios de gastos fijos)
+- [ ] Onboarding mejorado para nuevos usuarios
+- [ ] Tutorial interactivo
 
-**v1.0 - Funcionalidades Avanzadas**
-- [ ] Múltiples cuentas bancarias
+**v2.0 - Funcionalidades Avanzadas**
+- [ ] Múltiples fuentes de ingreso
 - [ ] Importación de movimientos bancarios
 - [ ] Presupuestos compartidos (parejas/familia)
-- [ ] Metas de ahorro a largo plazo
-- [ ] Integración con APIs bancarias
+- [ ] Metas de ahorro a largo plazo con proyecciones
+- [ ] Integración con APIs bancarias chilenas
 
 ---
 
@@ -260,8 +287,8 @@ emo-finance/
 │   │   │   ├── auth.py         # Autenticación (login/register)
 │   │   │   ├── periods.py      # Gestión de períodos
 │   │   │   ├── categories.py   # Gestión de categorías
-│   │   │   ├── expenses.py     # Gestión de gastos
-│   │   │   └── expense_templates.py  # Plantillas de gastos fijos
+│   │   │   ├── expenses.py     # Gestión de gastos (fijos/variables) [PRÓXIMAMENTE]
+│   │   │   └── aportes.py      # Gestión de aportes [PRÓXIMAMENTE]
 │   │   ├── core/               # Configuración y utilidades
 │   │   │   ├── config.py       # Variables de entorno
 │   │   │   ├── database.py     # Conexión a MongoDB
@@ -270,19 +297,20 @@ emo-finance/
 │   │   │   ├── user.py
 │   │   │   ├── period.py       # CRUD de períodos
 │   │   │   ├── category.py     # CRUD de categorías
-│   │   │   ├── expense.py      # CRUD de gastos
-│   │   │   └── expense_template.py  # CRUD de plantillas
+│   │   │   ├── expense.py      # CRUD de gastos [PRÓXIMAMENTE]
+│   │   │   └── aporte.py       # CRUD de aportes [PRÓXIMAMENTE]
 │   │   ├── models/             # Modelos Pydantic
 │   │   │   ├── user.py
 │   │   │   ├── period.py       # Modelo de períodos
 │   │   │   ├── category.py     # Modelo de categorías
-│   │   │   ├── expense.py      # Modelo de gastos
-│   │   │   └── expense_template.py  # Modelo de plantillas
+│   │   │   ├── expense.py      # Modelo de gastos [PRÓXIMAMENTE]
+│   │   │   └── aporte.py       # Modelo de aportes [PRÓXIMAMENTE]
 │   │   └── schemas/            # Schemas de request/response
 │   │       └── auth.py
 │   └── requirements.txt
 │
-├── PRODUCT_SPEC.md              # Especificación completa del producto
+├── LOGICA_SISTEMA.md            # 🧠 Lógica completa del sistema (REFERENCIA PRINCIPAL)
+├── PRODUCT_SPEC.md              # Especificación del producto (legacy)
 ├── docker-compose.yml           # Orquestación de contenedores
 └── README.md
 ```
@@ -357,12 +385,18 @@ FRONTEND_PORT=4200
 
 ## 📚 Documentación Adicional
 
-- **[PRODUCT_SPEC.md](PRODUCT_SPEC.md)**: Especificación completa del producto
-  - Modelo de datos detallado
-  - Endpoints de API propuestos
-  - Reglas de negocio
-  - Roadmap de desarrollo
-  - Consideraciones técnicas
+- **[LOGICA_SISTEMA.md](LOGICA_SISTEMA.md)**: 🧠 **DOCUMENTO PRINCIPAL** - Lógica completa del sistema
+  - Explicación detallada de las 4 categorías
+  - Sistema de gastos (fijos permanentes, temporales, variables)
+  - Sistema de aportes (fijos y variables)
+  - Flujo de períodos duales (mensual + crédito)
+  - Fórmulas y cálculos
+  - Modelo de datos completo
+  - Checklist de implementación para v1.0
+
+- **[PRODUCT_SPEC.md](PRODUCT_SPEC.md)**: Especificación del producto (legacy)
+  - Referencia histórica del diseño inicial
+  - Algunas secciones pueden estar desactualizadas
 
 ---
 

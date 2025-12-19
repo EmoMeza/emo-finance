@@ -52,7 +52,14 @@ class PeriodCRUD:
 
         # Si no existe período activo, crear uno automáticamente
         if not period:
-            period = await self._create_current_period(user_id, tipo_periodo or TipoPeriodo.MENSUAL_ESTANDAR)
+            # Si se pide período mensual, crear ambos (mensual y crédito)
+            if not tipo_periodo or tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
+                await self._create_both_periods(user_id)
+                # Volver a buscar el período mensual recién creado
+                period = await self.collection.find_one(query)
+            else:
+                # Si se pide período de crédito específicamente
+                period = await self._create_current_period(user_id, TipoPeriodo.CICLO_CREDITO)
 
         return PeriodInDB(**period) if period else None
 
@@ -99,6 +106,7 @@ class PeriodCRUD:
                 "arriendo": 0,
                 "credito_usable": 0
             },
+            "total_gastado": 0,  # Inicialmente en 0
             "estado": EstadoPeriodo.ACTIVO,
             "user_id": ObjectId(user_id),
             "created_at": datetime.utcnow(),
@@ -109,6 +117,14 @@ class PeriodCRUD:
         period_dict["_id"] = result.inserted_id
 
         return period_dict
+
+    async def _create_both_periods(self, user_id: str):
+        """Crear ambos períodos (mensual y crédito) para un usuario nuevo"""
+        # Crear período mensual estándar
+        await self._create_current_period(user_id, TipoPeriodo.MENSUAL_ESTANDAR)
+
+        # Crear período de crédito
+        await self._create_current_period(user_id, TipoPeriodo.CICLO_CREDITO)
 
     async def get_all(
         self,
@@ -181,6 +197,32 @@ class PeriodCRUD:
 
         return count > 0
 
-    def calculate_liquido(self, sueldo: float, metas: dict) -> float:
-        """Calcular el líquido disponible"""
-        return sueldo - metas.get("ahorro", 0) - metas.get("arriendo", 0) - metas.get("credito_usable", 0)
+    def calculate_liquido(self, sueldo: float, metas: dict, deuda_credito_anterior: float = 0) -> float:
+        """Calcular el líquido disponible, restando ahorro, arriendo, deuda anterior y crédito usable actual"""
+        return sueldo - metas.get("ahorro", 0) - metas.get("arriendo", 0) - deuda_credito_anterior 
+
+    async def get_previous_credit_period(self, user_id: str) -> Optional[PeriodInDB]:
+        """Obtener el período de crédito anterior (el que debe pagarse)"""
+        # Buscar el período de crédito activo
+        credit_period = await self.collection.find_one({
+            "user_id": ObjectId(user_id),
+            "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
+            "estado": EstadoPeriodo.ACTIVO
+        })
+
+        if not credit_period:
+            return None
+
+        # El período anterior es el que terminó justo antes del actual
+        # Buscar el período de crédito cerrado más reciente
+        previous_period = await self.collection.find_one(
+            {
+                "user_id": ObjectId(user_id),
+                "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
+                "estado": EstadoPeriodo.CERRADO,
+                "fecha_fin": {"$lt": credit_period["fecha_inicio"]}
+            },
+            sort=[("fecha_fin", -1)]
+        )
+
+        return PeriodInDB(**previous_period) if previous_period else None

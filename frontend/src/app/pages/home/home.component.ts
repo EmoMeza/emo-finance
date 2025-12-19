@@ -18,6 +18,8 @@ export class HomeComponent implements OnInit {
   isLoading = signal(true);
   error = signal('');
   showConfigModal = signal(false);
+  creditPeriod = signal<Period | null>(null);
+  isFirstTimeSetup = signal(false);
 
   // Computed signals para las 4 categorías
   ahorroCategory = computed(() =>
@@ -57,12 +59,13 @@ export class HomeComponent implements OnInit {
     sueldo: 0,
     ahorro: 0,
     arriendo: 0,
-    credito: 0
+    credito: 0,
+    deudaCreditoAnterior: 0  // Para usuarios nuevos: deuda del período de crédito anterior
   };
 
   // Computed para líquido calculado en tiempo real en el modal
   liquidoPreview = computed(() => {
-    return this.configForm.sueldo - this.configForm.ahorro - this.configForm.arriendo - this.configForm.credito;
+    return this.configForm.sueldo - this.configForm.ahorro - this.configForm.arriendo - this.configForm.deudaCreditoAnterior;
   });
 
   constructor(
@@ -86,6 +89,14 @@ export class HomeComponent implements OnInit {
 
       // Cargar período activo (ahora siempre existirá gracias al auto-create en backend)
       await this.loadActivePeriod();
+
+      // Cargar período de crédito
+      await this.loadCreditPeriod();
+
+      // Detectar si es la primera vez (período sin configurar Y período de crédito con total_gastado = 0)
+      const period = this.periodService.activePeriod();
+      const credit = this.creditPeriod();
+      this.isFirstTimeSetup.set(period?.sueldo === 0 && credit?.total_gastado === 0);
 
       // Si el período está sin configurar (sueldo = 0), mostrar modal automáticamente
       if (this.isPeriodUnconfigured()) {
@@ -128,6 +139,22 @@ export class HomeComponent implements OnInit {
     });
   }
 
+  private loadCreditPeriod(): Promise<void> {
+    return new Promise((resolve) => {
+      this.periodService.getActivePeriod(TipoPeriodo.CICLO_CREDITO).subscribe({
+        next: (period) => {
+          this.creditPeriod.set(period);
+          resolve();
+        },
+        error: (err) => {
+          // Si no hay período de crédito, no es crítico
+          console.warn('No credit period found:', err);
+          resolve();
+        }
+      });
+    });
+  }
+
   private calculatePercentage(value: number): number {
     const total = this.sueldo();
     return total > 0 ? Math.round((value / total) * 100) : 0;
@@ -162,6 +189,7 @@ export class HomeComponent implements OnInit {
     if (!period) return;
 
     try {
+      // Actualizar período mensual
       await this.periodService.updatePeriod(period._id, {
         sueldo: this.configForm.sueldo,
         metas_categorias: {
@@ -171,9 +199,17 @@ export class HomeComponent implements OnInit {
         }
       }).toPromise();
 
+      // Si es primera vez, actualizar el período de crédito con la deuda anterior
+      if (this.isFirstTimeSetup() && this.creditPeriod()) {
+        await this.periodService.updatePeriod(this.creditPeriod()!._id, {
+          total_gastado: this.configForm.deudaCreditoAnterior
+        }).toPromise();
+      }
+
       this.closeConfigModal();
-      // Recargar para obtener el período actualizado
+      // Recargar para obtener los períodos actualizados
       await this.loadActivePeriod();
+      await this.loadCreditPeriod();
     } catch (err: any) {
       console.error('Error saving period config:', err);
       this.error.set(err.error?.detail || 'Error al guardar la configuración');

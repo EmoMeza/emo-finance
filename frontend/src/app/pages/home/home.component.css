@@ -524,12 +524,24 @@
   margin-bottom: 1.5rem;
 }
 
+.form-group.highlight-group {
+  background: #fff5f5;
+  border: 2px solid #fc8181;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  margin-top: 1rem;
+}
+
 .form-group label {
   display: block;
   font-weight: 600;
   color: #4a5568;
   margin-bottom: 0.5rem;
   font-size: 0.95rem;
+}
+
+.form-group.highlight-group label {
+  color: #c53030;
 }
 
 .form-input {
@@ -560,6 +572,11 @@
   color: #718096;
   margin-top: 0.25rem;
   font-weight: 500;
+}
+
+.input-hint.warning-hint {
+  color: #c53030;
+  font-weight: 600;
 }
 
 /* Liquido Preview */

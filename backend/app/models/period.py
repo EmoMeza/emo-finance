@@ -60,6 +60,7 @@ class PeriodBase(BaseModel):
     sueldo: float = Field(..., ge=0, description="Sueldo o ingreso total del período")
     metas_categorias: MetasCategorias = Field(..., description="Metas de asignación por categoría")
     estado: EstadoPeriodo = Field(default=EstadoPeriodo.ACTIVO, description="Estado del período")
+    total_gastado: float = Field(default=0, ge=0, description="Total gastado en este período (usado para períodos de crédito)")
 
     @field_validator('fecha_fin')
     @classmethod
@@ -79,6 +80,7 @@ class PeriodUpdate(BaseModel):
     sueldo: Optional[float] = Field(None, gt=0)
     metas_categorias: Optional[MetasCategorias] = None
     estado: Optional[EstadoPeriodo] = None
+    total_gastado: Optional[float] = Field(None, ge=0)
 
     @field_validator('sueldo')
     @classmethod
@@ -112,6 +114,7 @@ class PeriodResponse(BaseModel):
     sueldo: float
     metas_categorias: MetasCategorias
     estado: EstadoPeriodo
+    total_gastado: float = Field(default=0, description="Total gastado en este período")
     liquido_calculado: float = Field(..., description="Líquido calculado automáticamente")
     created_at: datetime
     updated_at: datetime
