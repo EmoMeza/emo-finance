@@ -1,25 +1,48 @@
-from typing import Optional, List
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from typing import List, Optional
+from datetime import datetime, timedelta
+from calendar import monthrange
 from bson import ObjectId
-from datetime import datetime, date
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.models.period import (
     PeriodCreate,
     PeriodUpdate,
     PeriodInDB,
-    EstadoPeriodo,
     TipoPeriodo,
+    EstadoPeriodo,
     MetasCategorias
 )
+from app.models.expense import ExpenseCreate, TipoGasto
+from app.models.aporte import AporteCreate
 
 
 class PeriodCRUD:
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db.periods
+    """
+    CRUD operations para Periods según LOGICA_SISTEMA.md
 
-    async def create(self, user_id: str, period_data: PeriodCreate) -> PeriodInDB:
-        """Crear un nuevo período"""
-        period_dict = period_data.model_dump()
+    Implementa toda la lógica de:
+    - Creación automática de períodos
+    - Copia de gastos fijos (permanentes y temporales)
+    - Copia de aportes fijos
+    - Cálculo de liquidez
+    - Gestión de períodos mensuales y de crédito
+    """
+
+    def __init__(
+        self,
+        db: AsyncIOMotorDatabase,
+        expense_crud=None,
+        aporte_crud=None
+    ):
+        self.collection = db["periods"]
+        self.expense_crud = expense_crud
+        self.aporte_crud = aporte_crud
+
+    async def create(self, user_id: str, period: PeriodCreate) -> PeriodInDB:
+        """
+        Crear un nuevo período
+        """
+        period_dict = period.model_dump(exclude_none=True)
         period_dict["user_id"] = ObjectId(user_id)
         period_dict["created_at"] = datetime.utcnow()
         period_dict["updated_at"] = datetime.utcnow()
@@ -29,8 +52,10 @@ class PeriodCRUD:
 
         return PeriodInDB(**period_dict)
 
-    async def get_by_id(self, period_id: str, user_id: str) -> Optional[PeriodInDB]:
-        """Obtener un período por ID"""
+    async def get_by_id(self, user_id: str, period_id: str) -> Optional[PeriodInDB]:
+        """
+        Obtener período por ID
+        """
         period = await self.collection.find_one({
             "_id": ObjectId(period_id),
             "user_id": ObjectId(user_id)
@@ -38,144 +63,85 @@ class PeriodCRUD:
 
         return PeriodInDB(**period) if period else None
 
-    async def get_active_period(self, user_id: str, tipo_periodo: Optional[TipoPeriodo] = None) -> Optional[PeriodInDB]:
-        """Obtener el período activo del usuario, creándolo automáticamente si no existe"""
-        query = {
+    async def get_active(
+        self,
+        user_id: str,
+        tipo_periodo: TipoPeriodo
+    ) -> Optional[PeriodInDB]:
+        """
+        Obtener el período activo de un tipo específico
+
+        Si no existe, lo crea automáticamente
+        """
+        period = await self.collection.find_one({
             "user_id": ObjectId(user_id),
-            "estado": EstadoPeriodo.ACTIVO
-        }
-
-        if tipo_periodo:
-            query["tipo_periodo"] = tipo_periodo
-
-        period = await self.collection.find_one(query)
-
-        # Si no existe período activo, crear uno automáticamente
-        if not period:
-            # Si se pide período mensual, crear ambos (mensual y crédito)
-            if not tipo_periodo or tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
-                await self._create_both_periods(user_id)
-                # Volver a buscar el período mensual recién creado
-                period = await self.collection.find_one(query)
-            else:
-                # Si se pide período de crédito específicamente
-                period = await self._create_current_period(user_id, TipoPeriodo.CICLO_CREDITO)
-
-        return PeriodInDB(**period) if period else None
-
-    async def _create_current_period(self, user_id: str, tipo_periodo: TipoPeriodo) -> dict:
-        """Crear automáticamente el período del mes/ciclo actual con valores en 0"""
-        from datetime import timedelta
-        today = date.today()
-
-        if tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
-            # Período mensual estándar: día 1 al último día del mes
-            fecha_inicio = datetime(today.year, today.month, 1, 0, 0, 0)
-            # Calcular último día del mes
-            if today.month == 12:
-                fecha_fin = datetime(today.year, 12, 31, 23, 59, 59)
-            else:
-                next_month = datetime(today.year, today.month + 1, 1, 0, 0, 0)
-                fecha_fin = next_month - timedelta(seconds=1)
-        else:
-            # Período de crédito: día 25 del mes anterior al 24 del mes actual
-            if today.day >= 25:
-                # Si estamos después del día 25, el período va del 25 de este mes al 24 del siguiente
-                fecha_inicio = datetime(today.year, today.month, 25, 0, 0, 0)
-                if today.month == 12:
-                    fecha_fin = datetime(today.year + 1, 1, 24, 23, 59, 59)
-                else:
-                    fecha_fin = datetime(today.year, today.month + 1, 24, 23, 59, 59)
-            else:
-                # Si estamos antes del día 25, el período va del 25 del mes pasado al 24 de este mes
-                if today.month == 1:
-                    fecha_inicio = datetime(today.year - 1, 12, 25, 0, 0, 0)
-                else:
-                    fecha_inicio = datetime(today.year, today.month - 1, 25, 0, 0, 0)
-                fecha_fin = datetime(today.year, today.month, 24, 23, 59, 59)
-
-        # Crear período directamente como dict para evitar validaciones de Pydantic
-        # (permitimos sueldo = 0 para períodos sin configurar)
-        period_dict = {
             "tipo_periodo": tipo_periodo,
-            "fecha_inicio": fecha_inicio,
-            "fecha_fin": fecha_fin,
-            "sueldo": 0,  # Se permite 0 en la creación automática
-            "metas_categorias": {
-                "ahorro": 0,
-                "arriendo": 0,
-                "credito_usable": 0
-            },
-            "total_gastado": 0,  # Inicialmente en 0
-            "estado": EstadoPeriodo.ACTIVO,
-            "user_id": ObjectId(user_id),
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        }
+            "estado": EstadoPeriodo.ACTIVO
+        })
 
-        result = await self.collection.insert_one(period_dict)
-        period_dict["_id"] = result.inserted_id
+        if period:
+            return PeriodInDB(**period)
 
-        return period_dict
-
-    async def _create_both_periods(self, user_id: str):
-        """Crear ambos períodos (mensual y crédito) para un usuario nuevo"""
-        # Crear período mensual estándar
-        await self._create_current_period(user_id, TipoPeriodo.MENSUAL_ESTANDAR)
-
-        # Crear período de crédito
-        await self._create_current_period(user_id, TipoPeriodo.CICLO_CREDITO)
+        # No existe período activo, crear uno nuevo
+        return await self._create_current_period(user_id, tipo_periodo)
 
     async def get_all(
         self,
         user_id: str,
-        skip: int = 0,
-        limit: int = 10,
-        estado: Optional[EstadoPeriodo] = None,
-        tipo_periodo: Optional[TipoPeriodo] = None
+        tipo_periodo: Optional[TipoPeriodo] = None,
+        estado: Optional[EstadoPeriodo] = None
     ) -> List[PeriodInDB]:
-        """Obtener todos los períodos del usuario con filtros"""
+        """
+        Obtener todos los períodos con filtros opcionales
+        """
         query = {"user_id": ObjectId(user_id)}
 
-        if estado:
-            query["estado"] = estado
         if tipo_periodo:
             query["tipo_periodo"] = tipo_periodo
 
-        cursor = self.collection.find(query).sort("fecha_inicio", -1).skip(skip).limit(limit)
-        periods = await cursor.to_list(length=limit)
+        if estado:
+            query["estado"] = estado
 
-        return [PeriodInDB(**period) for period in periods]
+        cursor = self.collection.find(query).sort("fecha_inicio", -1)
+        periods = await cursor.to_list(length=None)
 
-    async def update(self, period_id: str, user_id: str, update_data: PeriodUpdate) -> Optional[PeriodInDB]:
-        """Actualizar un período"""
-        update_dict = {k: v for k, v in update_data.model_dump(exclude_unset=True).items() if v is not None}
+        return [PeriodInDB(**per) for per in periods]
 
-        if not update_dict:
-            return await self.get_by_id(period_id, user_id)
+    async def update(self, user_id: str, period_id: str, period_update: PeriodUpdate) -> Optional[PeriodInDB]:
+        """
+        Actualizar un período
+        Permite editar sueldo, metas, estado y total_gastado
+        """
+        update_data = period_update.model_dump(exclude_none=True)
 
-        update_dict["updated_at"] = datetime.utcnow()
+        if not update_data:
+            return await self.get_by_id(user_id, period_id)
+
+        update_data["updated_at"] = datetime.utcnow()
 
         result = await self.collection.find_one_and_update(
             {"_id": ObjectId(period_id), "user_id": ObjectId(user_id)},
-            {"$set": update_dict},
+            {"$set": update_data},
             return_document=True
         )
 
         return PeriodInDB(**result) if result else None
 
-    async def close_period(self, period_id: str, user_id: str) -> Optional[PeriodInDB]:
-        """Cerrar un período"""
-        result = await self.collection.find_one_and_update(
-            {"_id": ObjectId(period_id), "user_id": ObjectId(user_id)},
-            {"$set": {"estado": EstadoPeriodo.CERRADO, "updated_at": datetime.utcnow()}},
-            return_document=True
+    async def close_period(self, user_id: str, period_id: str) -> Optional[PeriodInDB]:
+        """
+        Cerrar un período (marcar como CERRADO)
+        """
+        return await self.update(
+            user_id,
+            period_id,
+            PeriodUpdate(estado=EstadoPeriodo.CERRADO)
         )
 
-        return PeriodInDB(**result) if result else None
-
-    async def delete(self, period_id: str, user_id: str) -> bool:
-        """Eliminar un período"""
+    async def delete(self, user_id: str, period_id: str) -> bool:
+        """
+        Eliminar un período
+        NOTA: En producción, probablemente NO se deberían eliminar períodos
+        """
         result = await self.collection.delete_one({
             "_id": ObjectId(period_id),
             "user_id": ObjectId(user_id)
@@ -183,46 +149,292 @@ class PeriodCRUD:
 
         return result.deleted_count > 0
 
-    async def count(self, user_id: str) -> int:
-        """Contar períodos del usuario"""
-        return await self.collection.count_documents({"user_id": ObjectId(user_id)})
+    # ====================
+    # LÓGICA DE CREACIÓN AUTOMÁTICA
+    # ====================
 
-    async def has_active_period(self, user_id: str, tipo_periodo: TipoPeriodo) -> bool:
-        """Verificar si el usuario tiene un período activo de cierto tipo"""
-        count = await self.collection.count_documents({
+    async def _create_current_period(
+        self,
+        user_id: str,
+        tipo_periodo: TipoPeriodo
+    ) -> PeriodInDB:
+        """
+        Crear el período actual según el tipo
+
+        Flujo:
+        1. Calcular fechas según tipo de período
+        2. Buscar período anterior cerrado
+        3. Si existe anterior, copiar gastos/aportes fijos
+        4. Si es período mensual y existe período de crédito cerrado, obtener deuda
+        """
+        now = datetime.utcnow()
+
+        if tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
+            fecha_inicio, fecha_fin = self._calculate_mensual_dates(now)
+        else:  # CICLO_CREDITO
+            fecha_inicio, fecha_fin = self._calculate_credito_dates(now)
+
+        # Buscar período anterior
+        previous_period = await self._get_previous_period(user_id, tipo_periodo)
+
+        # Crear período base
+        period_dict = {
             "user_id": ObjectId(user_id),
+            "tipo_periodo": tipo_periodo,
+            "fecha_inicio": fecha_inicio,
+            "fecha_fin": fecha_fin,
+            "sueldo": 0,
+            "metas_categorias": MetasCategorias().model_dump(),
             "estado": EstadoPeriodo.ACTIVO,
-            "tipo_periodo": tipo_periodo
-        })
+            "total_gastado": 0,
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
+        }
 
-        return count > 0
+        # Si hay período anterior, copiar metas y sueldo
+        if previous_period:
+            period_dict["sueldo"] = previous_period.sueldo
+            period_dict["metas_categorias"] = previous_period.metas_categorias.model_dump()
 
-    def calculate_liquido(self, sueldo: float, metas: dict, deuda_credito_anterior: float = 0) -> float:
-        """Calcular el líquido disponible, restando ahorro, arriendo, deuda anterior y crédito usable actual"""
-        return sueldo - metas.get("ahorro", 0) - metas.get("arriendo", 0) - deuda_credito_anterior 
+        result = await self.collection.insert_one(period_dict)
+        period_dict["_id"] = result.inserted_id
 
-    async def get_previous_credit_period(self, user_id: str) -> Optional[PeriodInDB]:
-        """Obtener el período de crédito anterior (el que debe pagarse)"""
-        # Buscar el período de crédito activo
-        credit_period = await self.collection.find_one({
-            "user_id": ObjectId(user_id),
-            "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
-            "estado": EstadoPeriodo.ACTIVO
-        })
+        new_period = PeriodInDB(**period_dict)
 
-        if not credit_period:
-            return None
+        # Copiar gastos fijos y aportes fijos del período anterior
+        if previous_period and self.expense_crud and self.aporte_crud:
+            await self._copy_fixed_items(user_id, previous_period, new_period)
 
-        # El período anterior es el que terminó justo antes del actual
-        # Buscar el período de crédito cerrado más reciente
-        previous_period = await self.collection.find_one(
+        return new_period
+
+    async def _get_previous_period(
+        self,
+        user_id: str,
+        tipo_periodo: TipoPeriodo
+    ) -> Optional[PeriodInDB]:
+        """
+        Obtener el período anterior cerrado más reciente del mismo tipo
+        """
+        period = await self.collection.find_one(
             {
                 "user_id": ObjectId(user_id),
-                "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
-                "estado": EstadoPeriodo.CERRADO,
-                "fecha_fin": {"$lt": credit_period["fecha_inicio"]}
+                "tipo_periodo": tipo_periodo,
+                "estado": EstadoPeriodo.CERRADO
             },
             sort=[("fecha_fin", -1)]
         )
 
-        return PeriodInDB(**previous_period) if previous_period else None
+        return PeriodInDB(**period) if period else None
+
+    async def _copy_fixed_items(
+        self,
+        user_id: str,
+        previous_period: PeriodInDB,
+        new_period: PeriodInDB
+    ):
+        """
+        Copiar gastos fijos y aportes fijos del período anterior al nuevo
+
+        Según LOGICA_SISTEMA.md:
+        1. Copiar gastos fijos permanentes (es_permanente=True)
+        2. Copiar gastos fijos temporales si periodos_restantes > 0 (decrementando el contador)
+        3. Copiar aportes fijos (es_fijo=True)
+        4. NO copiar gastos variables
+        5. NO copiar aportes variables
+        """
+        previous_id = str(previous_period.id)
+        new_id = str(new_period.id)
+
+        # 1. Copiar gastos fijos permanentes
+        fijos_permanentes = await self.expense_crud.get_fijos_permanentes(user_id, previous_id)
+
+        for gasto in fijos_permanentes:
+            expense_create = ExpenseCreate(
+                nombre=gasto.nombre,
+                monto=gasto.monto,
+                categoria_id=gasto.categoria_id,
+                tipo=TipoGasto.FIJO,
+                es_permanente=True,
+                descripcion=gasto.descripcion
+            )
+            await self.expense_crud.create(user_id, new_id, expense_create)
+
+        # 2. Copiar gastos fijos temporales con períodos > 0
+        fijos_temporales = await self.expense_crud.get_fijos_temporales_activos(user_id, previous_id)
+
+        for gasto in fijos_temporales:
+            # Decrementar períodos restantes
+            new_periodos = gasto.periodos_restantes - 1
+
+            # Solo copiar si quedan períodos restantes
+            if new_periodos >= 0:
+                expense_create = ExpenseCreate(
+                    nombre=gasto.nombre,
+                    monto=gasto.monto,
+                    categoria_id=gasto.categoria_id,
+                    tipo=TipoGasto.FIJO,
+                    es_permanente=False,
+                    periodos_restantes=new_periodos,
+                    descripcion=gasto.descripcion
+                )
+                await self.expense_crud.create(user_id, new_id, expense_create)
+
+        # 3. Copiar aportes fijos
+        aportes_fijos = await self.aporte_crud.get_fijos(user_id, previous_id)
+
+        for aporte in aportes_fijos:
+            aporte_create = AporteCreate(
+                nombre=aporte.nombre,
+                monto=aporte.monto,
+                categoria_id=aporte.categoria_id,
+                es_fijo=True,
+                descripcion=aporte.descripcion
+            )
+            await self.aporte_crud.create(user_id, new_id, aporte_create)
+
+    def _calculate_mensual_dates(self, reference_date: datetime) -> tuple:
+        """
+        Calcular fechas para período mensual estándar (1 al último día del mes)
+        """
+        # Primer día del mes
+        fecha_inicio = reference_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        # Último día del mes
+        last_day = monthrange(reference_date.year, reference_date.month)[1]
+        fecha_fin = reference_date.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+        return fecha_inicio, fecha_fin
+
+    def _calculate_credito_dates(self, reference_date: datetime) -> tuple:
+        """
+        Calcular fechas para período de crédito (25 al 24)
+
+        Lógica:
+        - Si estamos entre el 1 y el 24, el período va del 25 del mes anterior al 24 del mes actual
+        - Si estamos entre el 25 y el 31, el período va del 25 del mes actual al 24 del mes siguiente
+        """
+        if reference_date.day >= 25:
+            # Período actual: del 25 de este mes al 24 del siguiente
+            fecha_inicio = reference_date.replace(day=25, hour=0, minute=0, second=0, microsecond=0)
+
+            # Mes siguiente
+            if reference_date.month == 12:
+                next_month = 1
+                next_year = reference_date.year + 1
+            else:
+                next_month = reference_date.month + 1
+                next_year = reference_date.year
+
+            fecha_fin = reference_date.replace(
+                year=next_year,
+                month=next_month,
+                day=24,
+                hour=23,
+                minute=59,
+                second=59,
+                microsecond=999999
+            )
+        else:
+            # Período actual: del 25 del mes anterior al 24 de este mes
+            # Mes anterior
+            if reference_date.month == 1:
+                prev_month = 12
+                prev_year = reference_date.year - 1
+            else:
+                prev_month = reference_date.month - 1
+                prev_year = reference_date.year
+
+            fecha_inicio = reference_date.replace(
+                year=prev_year,
+                month=prev_month,
+                day=25,
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0
+            )
+
+            fecha_fin = reference_date.replace(day=24, hour=23, minute=59, second=59, microsecond=999999)
+
+        return fecha_inicio, fecha_fin
+
+    # ====================
+    # CÁLCULOS SEGÚN LOGICA_SISTEMA.md
+    # ====================
+
+    async def calculate_total_real_categoria(
+        self,
+        user_id: str,
+        periodo_id: str,
+        categoria_id: str
+    ) -> float:
+        """
+        Calcular el total REAL de una categoría según LOGICA_SISTEMA.md
+
+        Fórmula: total_categoria = suma(gastos_fijos) + suma(gastos_variables) - suma(aportes)
+        """
+        if not self.expense_crud or not self.aporte_crud:
+            return 0.0
+
+        total_gastos = await self.expense_crud.calculate_total_by_categoria(
+            user_id, periodo_id, categoria_id
+        )
+
+        total_aportes = await self.aporte_crud.calculate_total_by_categoria(
+            user_id, periodo_id, categoria_id
+        )
+
+        return total_gastos - total_aportes
+
+    async def calculate_liquidez(
+        self,
+        user_id: str,
+        period: PeriodInDB,
+        categoria_arriendo_id: str
+    ) -> float:
+        """
+        Calcular liquidez según LOGICA_SISTEMA.md
+
+        Fórmula: liquidez = sueldo - meta_ahorro - total_arriendo_real - credito_periodo_anterior
+
+        Donde:
+        - total_arriendo_real = gastos_arriendo - aportes_arriendo
+        - credito_periodo_anterior = total_gastado del período de crédito cerrado más reciente
+        """
+        # Obtener total real de arriendo
+        total_arriendo_real = await self.calculate_total_real_categoria(
+            user_id,
+            str(period.id),
+            categoria_arriendo_id
+        )
+
+        # Obtener crédito del período anterior
+        previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
+        credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
+
+        # Aplicar fórmula
+        liquidez = (
+            period.sueldo -
+            period.metas_categorias.ahorro -
+            total_arriendo_real -
+            credito_anterior
+        )
+
+        return liquidez
+
+    async def update_total_gastado(self, user_id: str, periodo_id: str) -> Optional[PeriodInDB]:
+        """
+        Actualizar el total_gastado de un período de crédito
+
+        Se llama automáticamente cuando se crea/modifica/elimina un gasto
+        """
+        if not self.expense_crud:
+            return None
+
+        total = await self.expense_crud.calculate_total_periodo(user_id, periodo_id)
+
+        return await self.update(
+            user_id,
+            periodo_id,
+            PeriodUpdate(total_gastado=total)
+        )

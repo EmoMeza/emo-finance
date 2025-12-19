@@ -1,18 +1,33 @@
-from typing import Optional, List
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from bson import ObjectId
+from typing import List, Optional
 from datetime import datetime
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.models.category import CategoryCreate, CategoryUpdate, CategoryInDB, TipoCategoria
+from app.models.category import (
+    CategoryCreate,
+    CategoryUpdate,
+    CategoryInDB,
+    DEFAULT_CATEGORIES,
+    TipoCategoria
+)
 
 
 class CategoryCRUD:
-    def __init__(self, db: AsyncIOMotorDatabase):
-        self.collection = db.categories
+    """
+    CRUD operations para Categories según LOGICA_SISTEMA.md
 
-    async def create(self, user_id: str, category_data: CategoryCreate) -> CategoryInDB:
-        """Crear una nueva categoría"""
-        category_dict = category_data.model_dump()
+    Las 4 categorías son fijas del sistema y se crean automáticamente
+    para cada usuario nuevo.
+    """
+
+    def __init__(self, db: AsyncIOMotorDatabase):
+        self.collection = db["categories"]
+
+    async def create(self, user_id: str, category: CategoryCreate) -> CategoryInDB:
+        """
+        Crear una nueva categoría
+        """
+        category_dict = category.model_dump(exclude_none=True)
         category_dict["user_id"] = ObjectId(user_id)
         category_dict["created_at"] = datetime.utcnow()
         category_dict["updated_at"] = datetime.utcnow()
@@ -22,8 +37,10 @@ class CategoryCRUD:
 
         return CategoryInDB(**category_dict)
 
-    async def get_by_id(self, category_id: str, user_id: str) -> Optional[CategoryInDB]:
-        """Obtener una categoría por ID"""
+    async def get_by_id(self, user_id: str, category_id: str) -> Optional[CategoryInDB]:
+        """
+        Obtener categoría por ID
+        """
         category = await self.collection.find_one({
             "_id": ObjectId(category_id),
             "user_id": ObjectId(user_id)
@@ -31,46 +48,52 @@ class CategoryCRUD:
 
         return CategoryInDB(**category) if category else None
 
-    async def get_by_type(self, user_id: str, tipo: TipoCategoria) -> Optional[CategoryInDB]:
-        """Obtener categoría por tipo"""
+    async def get_by_slug(self, user_id: str, slug: TipoCategoria) -> Optional[CategoryInDB]:
+        """
+        Obtener categoría por slug (ahorro, arriendo, credito, liquidez)
+        """
         category = await self.collection.find_one({
-            "user_id": ObjectId(user_id),
-            "tipo": tipo
+            "slug": slug,
+            "user_id": ObjectId(user_id)
         })
 
         return CategoryInDB(**category) if category else None
 
-    async def get_all(self, user_id: str, tipo: Optional[TipoCategoria] = None) -> List[CategoryInDB]:
-        """Obtener todas las categorías del usuario"""
-        query = {"user_id": ObjectId(user_id)}
-
-        if tipo:
-            query["tipo"] = tipo
-
-        cursor = self.collection.find(query).sort("tipo", 1)
-        categories = await cursor.to_list(length=100)
+    async def get_all(self, user_id: str) -> List[CategoryInDB]:
+        """
+        Obtener todas las categorías del usuario
+        Deberían ser siempre 4 (las fijas del sistema)
+        """
+        cursor = self.collection.find({"user_id": ObjectId(user_id)})
+        categories = await cursor.to_list(length=None)
 
         return [CategoryInDB(**cat) for cat in categories]
 
-    async def update(self, category_id: str, user_id: str, update_data: CategoryUpdate) -> Optional[CategoryInDB]:
-        """Actualizar una categoría"""
-        update_dict = {k: v for k, v in update_data.model_dump(exclude_unset=True).items() if v is not None}
+    async def update(self, user_id: str, category_id: str, category_update: CategoryUpdate) -> Optional[CategoryInDB]:
+        """
+        Actualizar una categoría
+        Solo permite editar nombre, icono, color y descripción
+        """
+        update_data = category_update.model_dump(exclude_none=True)
 
-        if not update_dict:
-            return await self.get_by_id(category_id, user_id)
+        if not update_data:
+            return await self.get_by_id(user_id, category_id)
 
-        update_dict["updated_at"] = datetime.utcnow()
+        update_data["updated_at"] = datetime.utcnow()
 
         result = await self.collection.find_one_and_update(
             {"_id": ObjectId(category_id), "user_id": ObjectId(user_id)},
-            {"$set": update_dict},
+            {"$set": update_data},
             return_document=True
         )
 
         return CategoryInDB(**result) if result else None
 
-    async def delete(self, category_id: str, user_id: str) -> bool:
-        """Eliminar una categoría"""
+    async def delete(self, user_id: str, category_id: str) -> bool:
+        """
+        Eliminar una categoría
+        NOTA: En producción, probablemente NO se deberían eliminar las 4 categorías fijas
+        """
         result = await self.collection.delete_one({
             "_id": ObjectId(category_id),
             "user_id": ObjectId(user_id)
@@ -78,62 +101,49 @@ class CategoryCRUD:
 
         return result.deleted_count > 0
 
-    async def initialize_default_categories(self, user_id: str) -> List[CategoryInDB]:
-        """Inicializar las 4 categorías predeterminadas para un nuevo usuario"""
-        default_categories = [
-            {
-                "nombre": "Ahorro",
-                "tipo": TipoCategoria.AHORRO,
-                "color": "#48bb78",
-                "icono": "💵",
-                "subcategorias": []
-            },
-            {
-                "nombre": "Arriendo",
-                "tipo": TipoCategoria.ARRIENDO,
-                "color": "#667eea",
-                "icono": "🏠",
-                "subcategorias": [
-                    {"nombre": "Arriendo Base", "color": "#764ba2"},
-                    {"nombre": "Luz", "color": "#f6ad55"},
-                    {"nombre": "Agua", "color": "#4299e1"},
-                    {"nombre": "Gas", "color": "#fc8181"},
-                    {"nombre": "Internet", "color": "#9f7aea"},
-                    {"nombre": "Gastos Comunes", "color": "#38b2ac"}
-                ]
-            },
-            {
-                "nombre": "Crédito Usable",
-                "tipo": TipoCategoria.CREDITO,
-                "color": "#f56565",
-                "icono": "💳",
-                "subcategorias": [
-                    {"nombre": "Suscripciones", "color": "#ed8936"},
-                    {"nombre": "Compras", "color": "#e53e3e"}
-                ]
-            },
-            {
-                "nombre": "Líquido",
-                "tipo": TipoCategoria.LIQUIDO,
-                "color": "#4299e1",
-                "icono": "💸",
-                "subcategorias": [
-                    {"nombre": "Locomoción", "color": "#38b2ac"},
-                    {"nombre": "Comida", "color": "#48bb78"},
-                    {"nombre": "Entretenimiento", "color": "#9f7aea"}
-                ]
-            }
-        ]
+    async def init_default_categories(self, user_id: str) -> List[CategoryInDB]:
+        """
+        Inicializar las 4 categorías por defecto para un usuario nuevo
 
+        Según LOGICA_SISTEMA.md:
+        1. 💵 Ahorro
+        2. 🏠 Arriendo
+        3. 💳 Crédito Usable
+        4. 💸 Liquidez
+
+        Esta función se debe llamar cuando un usuario se registra por primera vez.
+        """
+        # Verificar si ya existen categorías para este usuario
+        existing = await self.get_all(user_id)
+        if existing:
+            return existing
+
+        # Crear las 4 categorías por defecto
         created_categories = []
-        for cat_data in default_categories:
-            cat_dict = cat_data.copy()
-            cat_dict["user_id"] = ObjectId(user_id)
-            cat_dict["created_at"] = datetime.utcnow()
-            cat_dict["updated_at"] = datetime.utcnow()
 
-            result = await self.collection.insert_one(cat_dict)
-            cat_dict["_id"] = result.inserted_id
-            created_categories.append(CategoryInDB(**cat_dict))
+        for cat_data in DEFAULT_CATEGORIES:
+            category_dict = cat_data.copy()
+            category_dict["user_id"] = ObjectId(user_id)
+            category_dict["created_at"] = datetime.utcnow()
+            category_dict["updated_at"] = datetime.utcnow()
+
+            result = await self.collection.insert_one(category_dict)
+            category_dict["_id"] = result.inserted_id
+
+            created_categories.append(CategoryInDB(**category_dict))
 
         return created_categories
+
+    async def check_and_init_if_needed(self, user_id: str) -> List[CategoryInDB]:
+        """
+        Verificar si el usuario tiene las 4 categorías, si no las tiene, las crea
+        Útil para llamar en login o en get de categorías
+        """
+        categories = await self.get_all(user_id)
+
+        if len(categories) < 4:
+            # Falta alguna categoría, inicializar todas
+            await self.collection.delete_many({"user_id": ObjectId(user_id)})
+            categories = await self.init_default_categories(user_id)
+
+        return categories

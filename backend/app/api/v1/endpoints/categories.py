@@ -1,62 +1,67 @@
-from typing import List, Optional
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_active_user
 from app.crud.category import CategoryCRUD
 from app.models.user import UserInDB
-from app.models.category import CategoryCreate, CategoryUpdate, CategoryResponse, TipoCategoria
+from app.models.category import (
+    CategoryCreate,
+    CategoryUpdate,
+    CategoryResponse,
+    TipoCategoria
+)
 
 router = APIRouter()
 
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
 async def create_category(
-    category_data: CategoryCreate,
-    current_user: UserInDB = Depends(get_current_user),
+    category: CategoryCreate,
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Crear una nueva categoría personalizada.
-
-    Las 4 categorías principales ya existen por defecto, pero se pueden crear subcategorías.
+    Crear una nueva categoría (generalmente no se usa, las 4 categorías se crean automáticamente)
     """
     category_crud = CategoryCRUD(db)
-    category = await category_crud.create(str(current_user.id), category_data)
+    created = await category_crud.create(str(current_user.id), category)
 
     return CategoryResponse(
-        _id=str(category.id),
-        user_id=str(category.user_id),
-        nombre=category.nombre,
-        tipo=category.tipo,
-        color=category.color,
-        icono=category.icono,
-        subcategorias=category.subcategorias,
-        created_at=category.created_at,
-        updated_at=category.updated_at
+        _id=str(created.id),
+        user_id=str(created.user_id),
+        nombre=created.nombre,
+        slug=created.slug,
+        icono=created.icono,
+        color=created.color,
+        tiene_meta=created.tiene_meta,
+        descripcion=created.descripcion,
+        created_at=created.created_at,
+        updated_at=created.updated_at
     )
 
 
 @router.get("/", response_model=List[CategoryResponse])
 async def get_categories(
-    tipo: Optional[TipoCategoria] = None,
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Obtener todas las categorías del usuario, opcionalmente filtradas por tipo.
+    Obtener todas las categorías del usuario
+    Verifica y crea las 4 categorías por defecto si no existen
     """
     category_crud = CategoryCRUD(db)
-    categories = await category_crud.get_all(str(current_user.id), tipo)
+    categories = await category_crud.check_and_init_if_needed(str(current_user.id))
 
     return [
         CategoryResponse(
             _id=str(cat.id),
             user_id=str(cat.user_id),
             nombre=cat.nombre,
-            tipo=cat.tipo,
-            color=cat.color,
+            slug=cat.slug,
             icono=cat.icono,
-            subcategorias=cat.subcategorias,
+            color=cat.color,
+            tiene_meta=cat.tiene_meta,
+            descripcion=cat.descripcion,
             created_at=cat.created_at,
             updated_at=cat.updated_at
         )
@@ -65,36 +70,32 @@ async def get_categories(
 
 
 @router.post("/init-defaults", response_model=List[CategoryResponse])
-async def initialize_default_categories(
-    current_user: UserInDB = Depends(get_current_user),
+async def init_default_categories(
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Inicializar las 4 categorías predeterminadas para el usuario.
+    Inicializar las 4 categorías por defecto para el usuario
 
-    Solo debe llamarse una vez por usuario (al registrarse).
+    Las 4 categorías según LOGICA_SISTEMA.md:
+    1. 💵 Ahorro
+    2. 🏠 Arriendo
+    3. 💳 Crédito Usable
+    4. 💸 Liquidez
     """
     category_crud = CategoryCRUD(db)
-
-    # Verificar si ya tiene categorías
-    existing = await category_crud.get_all(str(current_user.id))
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El usuario ya tiene categorías inicializadas"
-        )
-
-    categories = await category_crud.initialize_default_categories(str(current_user.id))
+    categories = await category_crud.init_default_categories(str(current_user.id))
 
     return [
         CategoryResponse(
             _id=str(cat.id),
             user_id=str(cat.user_id),
             nombre=cat.nombre,
-            tipo=cat.tipo,
-            color=cat.color,
+            slug=cat.slug,
             icono=cat.icono,
-            subcategorias=cat.subcategorias,
+            color=cat.color,
+            tiene_meta=cat.tiene_meta,
+            descripcion=cat.descripcion,
             created_at=cat.created_at,
             updated_at=cat.updated_at
         )
@@ -105,29 +106,62 @@ async def initialize_default_categories(
 @router.get("/{category_id}", response_model=CategoryResponse)
 async def get_category(
     category_id: str,
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Obtener una categoría específica por ID.
+    Obtener una categoría por ID
     """
     category_crud = CategoryCRUD(db)
-    category = await category_crud.get_by_id(category_id, str(current_user.id))
+    category = await category_crud.get_by_id(str(current_user.id), category_id)
 
     if not category:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Categoría no encontrada"
+            detail="Category not found"
         )
 
     return CategoryResponse(
         _id=str(category.id),
         user_id=str(category.user_id),
         nombre=category.nombre,
-        tipo=category.tipo,
-        color=category.color,
+        slug=category.slug,
         icono=category.icono,
-        subcategorias=category.subcategorias,
+        color=category.color,
+        tiene_meta=category.tiene_meta,
+        descripcion=category.descripcion,
+        created_at=category.created_at,
+        updated_at=category.updated_at
+    )
+
+
+@router.get("/by-slug/{slug}", response_model=CategoryResponse)
+async def get_category_by_slug(
+    slug: TipoCategoria,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db=Depends(get_database)
+):
+    """
+    Obtener una categoría por slug (ahorro, arriendo, credito, liquidez)
+    """
+    category_crud = CategoryCRUD(db)
+    category = await category_crud.get_by_slug(str(current_user.id), slug)
+
+    if not category:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Category with slug '{slug}' not found"
+        )
+
+    return CategoryResponse(
+        _id=str(category.id),
+        user_id=str(category.user_id),
+        nombre=category.nombre,
+        slug=category.slug,
+        icono=category.icono,
+        color=category.color,
+        tiene_meta=category.tiene_meta,
+        descripcion=category.descripcion,
         created_at=category.created_at,
         updated_at=category.updated_at
     )
@@ -136,56 +170,55 @@ async def get_category(
 @router.put("/{category_id}", response_model=CategoryResponse)
 async def update_category(
     category_id: str,
-    update_data: CategoryUpdate,
-    current_user: UserInDB = Depends(get_current_user),
+    category_update: CategoryUpdate,
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Actualizar una categoría existente.
+    Actualizar una categoría
+    Solo permite editar nombre, icono, color y descripción
     """
     category_crud = CategoryCRUD(db)
-    category = await category_crud.update(category_id, str(current_user.id), update_data)
+    updated = await category_crud.update(str(current_user.id), category_id, category_update)
 
-    if not category:
+    if not updated:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Categoría no encontrada"
+            detail="Category not found"
         )
 
     return CategoryResponse(
-        _id=str(category.id),
-        user_id=str(category.user_id),
-        nombre=category.nombre,
-        tipo=category.tipo,
-        color=category.color,
-        icono=category.icono,
-        subcategorias=category.subcategorias,
-        created_at=category.created_at,
-        updated_at=category.updated_at
+        _id=str(updated.id),
+        user_id=str(updated.user_id),
+        nombre=updated.nombre,
+        slug=updated.slug,
+        icono=updated.icono,
+        color=updated.color,
+        tiene_meta=updated.tiene_meta,
+        descripcion=updated.descripcion,
+        created_at=updated.created_at,
+        updated_at=updated.updated_at
     )
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_category(
     category_id: str,
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
     """
-    Eliminar una categoría.
+    Eliminar una categoría
 
-    No se puede eliminar si tiene gastos asociados.
+    NOTA: En producción, probablemente NO se deberían eliminar las 4 categorías fijas
     """
     category_crud = CategoryCRUD(db)
-
-    # TODO: Verificar que no tenga gastos asociados antes de eliminar
-
-    deleted = await category_crud.delete(category_id, str(current_user.id))
+    deleted = await category_crud.delete(str(current_user.id), category_id)
 
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Categoría no encontrada"
+            detail="Category not found"
         )
 
     return None
