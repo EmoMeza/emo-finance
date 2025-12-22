@@ -12,12 +12,35 @@ from app.models.period import (
     PeriodCreate,
     PeriodUpdate,
     PeriodResponse,
+    PeriodInDB,
     TipoPeriodo,
     EstadoPeriodo
 )
 from app.models.category import TipoCategoria
 
 router = APIRouter()
+
+
+# ====================
+# HELPER FUNCTIONS
+# ====================
+
+def period_to_response(period: 'PeriodInDB') -> PeriodResponse:
+    """Convertir PeriodInDB a PeriodResponse"""
+    return PeriodResponse(
+        _id=str(period.id),
+        user_id=str(period.user_id),
+        tipo_periodo=period.tipo_periodo,
+        fecha_inicio=period.fecha_inicio,
+        fecha_fin=period.fecha_fin,
+        sueldo=period.sueldo,
+        metas_categorias=period.metas_categorias,
+        estado=period.estado,
+        categorias=[str(cat_id) for cat_id in (period.categorias if hasattr(period, 'categorias') and period.categorias else [])],
+        total_gastado=period.total_gastado,
+        created_at=period.created_at,
+        updated_at=period.updated_at
+    )
 
 
 # ====================
@@ -70,6 +93,7 @@ async def create_period(
         sueldo=created.sueldo,
         metas_categorias=created.metas_categorias,
         estado=created.estado,
+        categorias=[str(cat_id) for cat_id in (created.categorias if hasattr(created, 'categorias') and created.categorias else [])],
         total_gastado=created.total_gastado,
         created_at=created.created_at,
         updated_at=created.updated_at
@@ -236,14 +260,14 @@ async def get_period_summary(
             categoria_arriendo_id = cat_id
 
         # Obtener meta si aplica
+        # NOTA: Solo Crédito tiene meta real. Ahorro y Arriendo usan total_real como "meta"
         meta = None
         if cat.tiene_meta:
-            if cat.slug == TipoCategoria.AHORRO:
-                meta = period.metas_categorias.ahorro
-            elif cat.slug == TipoCategoria.ARRIENDO:
-                meta = period.metas_categorias.arriendo
-            elif cat.slug == TipoCategoria.CREDITO:
+            if cat.slug == TipoCategoria.CREDITO:
                 meta = period.metas_categorias.credito_usable
+            else:
+                # Para Ahorro y Arriendo, la "meta" es el total_real calculado
+                meta = total_real
 
         categories_summary.append(
             CategorySummary(

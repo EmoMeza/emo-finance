@@ -1,0 +1,334 @@
+<!-- Modal Overlay -->
+<div class="modal-overlay">
+  <div class="modal-content">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <h2>
+        <span>{{ category.icono }}</span>
+        {{ category.nombre }}
+      </h2>
+      <button class="close-btn" (click)="onClose()">&times;</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'resumen'"
+        (click)="setActiveTab('resumen')">
+        📊 Resumen
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'fijos'"
+        (click)="setActiveTab('fijos')">
+        🔄 Gastos Fijos
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'variables'"
+        (click)="setActiveTab('variables')">
+        📝 Gastos Variables
+      </button>
+      <button
+        class="tab"
+        [class.active]="activeTab() === 'aportes'"
+        (click)="setActiveTab('aportes')">
+        💰 Aportes
+      </button>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+
+      <!-- PESTAÑA: RESUMEN -->
+      <div *ngIf="activeTab() === 'resumen'" class="tab-panel">
+        <div class="summary-section">
+          <div class="summary-row" *ngIf="meta">
+            <span class="summary-label">Meta/Presupuesto:</span>
+            <span class="summary-value">{{ formatCurrency(meta) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Gastos Fijos:</span>
+            <span class="summary-value">{{ formatCurrency(totalGastosFijos()) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Gastos Variables:</span>
+            <span class="summary-value">{{ formatCurrency(totalGastosVariables()) }}</span>
+          </div>
+          <div class="summary-row">
+            <span class="summary-label">Total Aportes:</span>
+            <span class="summary-value negative">-{{ formatCurrency(totalAportes()) }}</span>
+          </div>
+          <hr>
+          <div class="summary-row total">
+            <span class="summary-label">TOTAL REAL:</span>
+            <span class="summary-value">{{ formatCurrency(totalReal()) }}</span>
+          </div>
+          <div class="summary-row" *ngIf="meta">
+            <span class="summary-label">Disponible:</span>
+            <span class="summary-value" [class.negative]="disponible() < 0">
+              {{ formatCurrency(disponible()) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PESTAÑA: GASTOS FIJOS -->
+      <div *ngIf="activeTab() === 'fijos'" class="tab-panel">
+        <div class="section-header">
+          <h3>🔄 Gastos Fijos Permanentes y Temporales</h3>
+          <button class="btn-primary" (click)="openAddExpenseForm('fijo')">
+            + Agregar Gasto Fijo
+          </button>
+        </div>
+
+        <!-- Formulario de agregar gasto fijo -->
+        <div *ngIf="showAddExpenseForm() && expenseType() === 'fijo'" class="form-card">
+          <h4>Nuevo Gasto Fijo</h4>
+
+          <div class="form-group">
+            <label>Nombre del gasto *</label>
+            <input
+              type="text"
+              [(ngModel)]="expenseForm.nombre"
+              placeholder="Ej: Netflix, Spotify, Arriendo"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label>Monto *</label>
+            <input
+              type="number"
+              [(ngModel)]="expenseForm.monto"
+              placeholder="0"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                [(ngModel)]="expenseForm.es_permanente">
+              <span>¿Es un gasto permanente?</span>
+            </label>
+            <small>Si no es permanente, se copiará solo por el número de períodos definidos (cuotas)</small>
+          </div>
+
+          <div class="form-group" *ngIf="!expenseForm.es_permanente">
+            <label>Períodos restantes (cuotas) *</label>
+            <input
+              type="number"
+              [(ngModel)]="expenseForm.periodos_restantes"
+              placeholder="Ej: 5"
+              min="1"
+              class="form-input">
+            <small>Ejemplo: Si son 5 cuotas, este gasto se copiará 5 veces</small>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción (opcional)</label>
+            <textarea
+              [(ngModel)]="expenseForm.descripcion"
+              placeholder="Notas adicionales"
+              class="form-textarea"
+              rows="2"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="cancelExpenseForm()">Cancelar</button>
+            <button class="btn-primary" (click)="saveExpense()">Guardar Gasto</button>
+          </div>
+        </div>
+
+        <!-- Lista de gastos fijos -->
+        <div class="items-list">
+          <div *ngIf="gastosFijos().length === 0" class="empty-state">
+            <p>No hay gastos fijos registrados</p>
+            <p class="empty-hint">Los gastos fijos se copian automáticamente cada período</p>
+          </div>
+
+          <div *ngFor="let expense of gastosFijos()" class="item-card">
+            <div class="item-info">
+              <div class="item-name">
+                {{ getExpenseLabel(expense) }}
+              </div>
+              <div class="item-description" *ngIf="expense.descripcion">
+                {{ expense.descripcion }}
+              </div>
+            </div>
+            <div class="item-actions">
+              <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+              <button class="btn-delete" (click)="deleteExpense(expense._id)">🗑️</button>
+            </div>
+          </div>
+
+          <div *ngIf="gastosFijos().length > 0" class="items-total">
+            <strong>Total:</strong>
+            <strong>{{ formatCurrency(totalGastosFijos()) }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- PESTAÑA: GASTOS VARIABLES -->
+      <div *ngIf="activeTab() === 'variables'" class="tab-panel">
+        <div class="section-header">
+          <h3>📝 Gastos Variables del Período</h3>
+          <button class="btn-primary" (click)="openAddExpenseForm('variable')">
+            + Agregar Gasto Variable
+          </button>
+        </div>
+
+        <!-- Formulario de agregar gasto variable -->
+        <div *ngIf="showAddExpenseForm() && expenseType() === 'variable'" class="form-card">
+          <h4>Nuevo Gasto Variable</h4>
+
+          <div class="form-group">
+            <label>Nombre del gasto *</label>
+            <input
+              type="text"
+              [(ngModel)]="expenseForm.nombre"
+              placeholder="Ej: Pizza, Regalo, Emergencia"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label>Monto *</label>
+            <input
+              type="number"
+              [(ngModel)]="expenseForm.monto"
+              placeholder="0"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label>Descripción (opcional)</label>
+            <textarea
+              [(ngModel)]="expenseForm.descripcion"
+              placeholder="Notas adicionales"
+              class="form-textarea"
+              rows="2"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="cancelExpenseForm()">Cancelar</button>
+            <button class="btn-primary" (click)="saveExpense()">Guardar Gasto</button>
+          </div>
+        </div>
+
+        <!-- Lista de gastos variables -->
+        <div class="items-list">
+          <div *ngIf="gastosVariables().length === 0" class="empty-state">
+            <p>No hay gastos variables registrados</p>
+            <p class="empty-hint">Los gastos variables son únicos de este período</p>
+          </div>
+
+          <div *ngFor="let expense of gastosVariables()" class="item-card">
+            <div class="item-info">
+              <div class="item-name">{{ expense.nombre }}</div>
+              <div class="item-description" *ngIf="expense.descripcion">
+                {{ expense.descripcion }}
+              </div>
+              <div class="item-date">{{ expense.fecha_registro | date: 'dd/MM/yyyy' }}</div>
+            </div>
+            <div class="item-actions">
+              <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+              <button class="btn-delete" (click)="deleteExpense(expense._id)">🗑️</button>
+            </div>
+          </div>
+
+          <div *ngIf="gastosVariables().length > 0" class="items-total">
+            <strong>Total:</strong>
+            <strong>{{ formatCurrency(totalGastosVariables()) }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- PESTAÑA: APORTES -->
+      <div *ngIf="activeTab() === 'aportes'" class="tab-panel">
+        <div class="section-header">
+          <h3>💰 Aportes del Período</h3>
+          <button class="btn-primary" (click)="openAddAporteForm()">
+            + Agregar Aporte
+          </button>
+        </div>
+
+        <!-- Formulario de agregar aporte -->
+        <div *ngIf="showAddAporteForm()" class="form-card">
+          <h4>Nuevo Aporte</h4>
+
+          <div class="form-group">
+            <label>Nombre del aporte *</label>
+            <input
+              type="text"
+              [(ngModel)]="aporteForm.nombre"
+              placeholder="Ej: Aporte pareja, Venta celular"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label>Monto *</label>
+            <input
+              type="number"
+              [(ngModel)]="aporteForm.monto"
+              placeholder="0"
+              class="form-input">
+          </div>
+
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                [(ngModel)]="aporteForm.es_fijo">
+              <span>¿Es un aporte fijo?</span>
+            </label>
+            <small>Los aportes fijos se copian automáticamente cada período</small>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción (opcional)</label>
+            <textarea
+              [(ngModel)]="aporteForm.descripcion"
+              placeholder="Notas adicionales"
+              class="form-textarea"
+              rows="2"></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn-secondary" (click)="cancelAporteForm()">Cancelar</button>
+            <button class="btn-primary" (click)="saveAporte()">Guardar Aporte</button>
+          </div>
+        </div>
+
+        <!-- Lista de aportes -->
+        <div class="items-list">
+          <div *ngIf="aportes().length === 0" class="empty-state">
+            <p>No hay aportes registrados</p>
+            <p class="empty-hint">Los aportes reducen el gasto total de la categoría</p>
+          </div>
+
+          <div *ngFor="let aporte of aportes()" class="item-card aporte">
+            <div class="item-info">
+              <div class="item-name">{{ getAporteLabel(aporte) }}</div>
+              <div class="item-description" *ngIf="aporte.descripcion">
+                {{ aporte.descripcion }}
+              </div>
+              <div class="item-date">{{ aporte.fecha_registro | date: 'dd/MM/yyyy' }}</div>
+            </div>
+            <div class="item-actions">
+              <span class="item-amount positive">+{{ formatCurrency(aporte.monto) }}</span>
+              <button class="btn-delete" (click)="deleteAporte(aporte._id)">🗑️</button>
+            </div>
+          </div>
+
+          <div *ngIf="aportes().length > 0" class="items-total">
+            <strong>Total Aportes:</strong>
+            <strong class="positive">+{{ formatCurrency(totalAportes()) }}</strong>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

@@ -24,10 +24,10 @@
         <div class="config-alert">
           <span class="alert-icon">⚠️</span>
           <span>Período sin configurar</span>
-          <button class="btn-config" (click)="openConfigModal()">Configurar</button>
+          <button class="btn-config" (click)="openInitialSetupModal()">Configurar</button>
         </div>
       } @else {
-        <button class="btn-edit" (click)="openConfigModal()">
+        <button class="btn-edit" (click)="openInitialSetupModal()">
           <span>✏️</span>
           Editar Período
         </button>
@@ -37,7 +37,7 @@
     <!-- Grid de 4 categorías -->
     <div class="categories-grid">
       <!-- Ahorro -->
-      <div class="category-card ahorro">
+      <div class="category-card ahorro clickable" (click)="openAhorroModal()">
         <div class="card-header">
           <span class="card-icon">{{ ahorroCategory()?.icono || '💵' }}</span>
           <h3>{{ ahorroCategory()?.nombre || 'Ahorro' }}</h3>
@@ -49,10 +49,13 @@
           </div>
           <span class="percentage">{{ porcentajeAhorro() }}% del sueldo</span>
         </div>
+        <div class="card-footer">
+          <span class="view-details">Ver detalles →</span>
+        </div>
       </div>
 
       <!-- Arriendo -->
-      <div class="category-card arriendo">
+      <div class="category-card arriendo clickable" (click)="openArriendoModal()">
         <div class="card-header">
           <span class="card-icon">{{ arriendoCategory()?.icono || '🏠' }}</span>
           <h3>{{ arriendoCategory()?.nombre || 'Arriendo' }}</h3>
@@ -64,10 +67,13 @@
           </div>
           <span class="percentage">{{ porcentajeArriendo() }}% del sueldo</span>
         </div>
+        <div class="card-footer">
+          <span class="view-details">Ver detalles →</span>
+        </div>
       </div>
 
       <!-- Crédito Usable -->
-      <div class="category-card credito">
+      <div class="category-card credito clickable" (click)="openCreditoModal()">
         <div class="card-header">
           <span class="card-icon">{{ creditoCategory()?.icono || '💳' }}</span>
           <h3>{{ creditoCategory()?.nombre || 'Crédito' }}</h3>
@@ -79,10 +85,13 @@
           </div>
           <span class="percentage">{{ porcentajeCredito() }}% del sueldo</span>
         </div>
+        <div class="card-footer">
+          <span class="view-details">Ver detalles →</span>
+        </div>
       </div>
 
       <!-- Líquido (Calculado) -->
-      <div class="category-card liquido highlight">
+      <div class="category-card liquido highlight clickable" (click)="openLiquidoModal()">
         <div class="card-header">
           <span class="card-icon">{{ liquidoCategory()?.icono || '💸' }}</span>
           <h3>{{ liquidoCategory()?.nombre || 'Líquido' }}</h3>
@@ -94,6 +103,9 @@
             <div class="progress-fill liquido-fill" [style.width.%]="porcentajeLiquido()"></div>
           </div>
           <span class="percentage">{{ porcentajeLiquido() }}% disponible</span>
+        </div>
+        <div class="card-footer">
+          <span class="view-details">Ver detalles →</span>
         </div>
       </div>
     </div>
@@ -122,130 +134,21 @@
     </div>
   }
 
-  <!-- Modal de Configuración de Período -->
-  @if (showConfigModal()) {
-    <div class="modal-overlay" (click)="closeConfigModal()">
-      <div class="modal-content" (click)="$event.stopPropagation()">
-        <div class="modal-header">
-          <h2>Configurar Período</h2>
-          <button class="btn-close" (click)="closeConfigModal()">✕</button>
-        </div>
+  <!-- Modal de Configuración Inicial -->
+  @if (showInitialSetupModal()) {
+    <app-initial-setup-modal
+      (close)="closeInitialSetupModal()"
+      (complete)="onInitialSetupComplete()"
+    ></app-initial-setup-modal>
+  }
 
-        <div class="modal-body">
-          <p class="modal-description">
-            Define tu sueldo y las metas para este período. El líquido se calculará automáticamente.
-          </p>
-
-          <!-- Sueldo -->
-          <div class="form-group">
-            <label for="sueldo">💰 Sueldo del Período</label>
-            <input
-              type="number"
-              id="sueldo"
-              [(ngModel)]="configForm.sueldo"
-              class="form-input"
-              placeholder="Ej: 1500000"
-              min="0"
-            >
-          </div>
-
-          <!-- Ahorro -->
-          <div class="form-group">
-            <label for="ahorro">💵 Meta de Ahorro</label>
-            <input
-              type="number"
-              id="ahorro"
-              [(ngModel)]="configForm.ahorro"
-              class="form-input"
-              placeholder="Ej: 200000"
-              min="0"
-            >
-            <span class="input-hint">
-              {{ calculatePercentagePreview(configForm.ahorro) }}% del sueldo
-            </span>
-          </div>
-
-          <!-- Arriendo -->
-          <div class="form-group">
-            <label for="arriendo">🏠 Presupuesto Arriendo</label>
-            <input
-              type="number"
-              id="arriendo"
-              [(ngModel)]="configForm.arriendo"
-              class="form-input"
-              placeholder="Ej: 400000"
-              min="0"
-            >
-            <span class="input-hint">
-              {{ calculatePercentagePreview(configForm.arriendo) }}% del sueldo
-            </span>
-          </div>
-
-          <!-- Crédito Usable -->
-          <div class="form-group">
-            <label for="credito">💳 Crédito Usable (Este Período)</label>
-            <input
-              type="number"
-              id="credito"
-              [(ngModel)]="configForm.credito"
-              class="form-input"
-              placeholder="Ej: 300000"
-              min="0"
-            >
-            <span class="input-hint">
-              Límite para el período de crédito actual
-            </span>
-          </div>
-
-          <!-- Deuda de Crédito Anterior (solo primera vez) -->
-          @if (isFirstTimeSetup()) {
-            <div class="form-group highlight-group">
-              <label for="deudaCredito">🔴 Deuda del Período de Crédito Anterior</label>
-              <input
-                type="number"
-                id="deudaCredito"
-                [(ngModel)]="configForm.deudaCreditoAnterior"
-                class="form-input"
-                placeholder="Ej: 250000"
-                min="0"
-              >
-              <span class="input-hint warning-hint">
-                ⚠️ Cuánto gastaste en tu tarjeta el mes pasado (se restará del líquido)
-              </span>
-            </div>
-          }
-
-          <!-- Líquido Calculado -->
-          <div class="liquido-preview">
-            <div class="preview-label">💸 Líquido Disponible (Calculado)</div>
-            <div class="preview-amount" [class.negative]="liquidoPreview() < 0">
-              {{ formatCurrency(liquidoPreview()) }}
-            </div>
-            <div class="preview-percentage">
-              {{ calculatePercentagePreview(liquidoPreview()) }}% del sueldo
-            </div>
-          </div>
-
-          @if (liquidoPreview() < 0) {
-            <div class="alert-warning">
-              ⚠️ Las metas superan el sueldo. Ajusta los valores.
-            </div>
-          }
-        </div>
-
-        <div class="modal-footer">
-          <button class="btn-secondary" (click)="closeConfigModal()">
-            Cancelar
-          </button>
-          <button
-            class="btn-primary"
-            (click)="savePeriodConfig()"
-            [disabled]="configForm.sueldo <= 0 || liquidoPreview() < 0"
-          >
-            Guardar Configuración
-          </button>
-        </div>
-      </div>
-    </div>
+  <!-- Modal de Detalle de Categoría -->
+  @if (showCategoryModal() && selectedCategory()) {
+    <app-category-detail-modal
+      [category]="selectedCategory()!"
+      [periodoId]="selectedPeriodId()"
+      [meta]="selectedCategoryMeta()"
+      (close)="closeCategoryModal()"
+    ></app-category-detail-modal>
   }
 </div>

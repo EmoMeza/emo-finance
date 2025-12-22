@@ -1,0 +1,621 @@
+<!-- Modal Overlay -->
+<div class="modal-overlay">
+  <div class="modal-content">
+
+    <!-- Header -->
+    <div class="modal-header">
+      <h2>⚙️ Configuración Inicial</h2>
+      <button class="close-btn" (click)="onClose()">&times;</button>
+    </div>
+
+    <!-- Progress Indicator -->
+    <div class="progress-bar">
+      <div class="progress-fill" [style.width.%]="(currentStep() / totalSteps) * 100"></div>
+    </div>
+    <div class="step-indicator">
+      Paso {{ currentStep() }} de {{ totalSteps }}
+    </div>
+
+    <!-- Content Area -->
+    <div class="modal-body">
+
+      <!-- PASO 1: DATOS BÁSICOS -->
+      <div *ngIf="currentStep() === 1" class="step-content">
+        <h3>💰 Datos Básicos del Período</h3>
+        <p class="step-description">Ingresa tu sueldo mensual y la deuda de crédito del mes anterior</p>
+
+        <div class="form-group">
+          <label>Sueldo Mensual *</label>
+          <input
+            type="number"
+            [(ngModel)]="sueldo"
+            placeholder="0"
+            class="form-input">
+          <small>Tu ingreso mensual total</small>
+        </div>
+
+        <div class="form-group">
+          <label>Deuda de Crédito del Mes Anterior</label>
+          <input
+            type="number"
+            [(ngModel)]="creditoAnterior"
+            placeholder="0"
+            class="form-input">
+          <small>Si es tu primer mes, déjalo en 0. Si tienes deuda del mes pasado, ingrésala aquí.</small>
+        </div>
+      </div>
+
+      <!-- PASO 2: AHORRO -->
+      <div *ngIf="currentStep() === 2" class="step-content">
+        <h3>🎯 Categoría: Ahorro</h3>
+        <p class="step-description">Define tus gastos fijos y aportes para ahorro</p>
+
+        <!-- Resumen de Ahorro -->
+        <div class="summary-card">
+          <div class="summary-row">
+            <span>Total Gastos Fijos:</span>
+            <strong>{{ formatCurrency(totalGastosFijosAhorro()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total Aportes:</span>
+            <strong class="positive">-{{ formatCurrency(totalAportesAhorro()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Meta de Ahorro (Real):</span>
+            <strong>{{ formatCurrency(totalRealAhorro()) }}</strong>
+          </div>
+        </div>
+
+        <!-- Gastos Fijos -->
+        <div class="section">
+          <div class="section-header">
+            <h4>🔄 Gastos Fijos</h4>
+            <button class="btn-small btn-primary" (click)="openExpenseForm()">+ Agregar</button>
+          </div>
+
+          <!-- Formulario de gasto -->
+          <div *ngIf="showExpenseForm()" class="inline-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="expenseForm.nombre"
+                  placeholder="Ej: Inversión mensual"
+                  class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  [(ngModel)]="expenseForm.monto"
+                  placeholder="0"
+                  class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="expenseForm.es_permanente">
+                <span>¿Es permanente?</span>
+              </label>
+              <small>Si no es permanente, especifica cuántos meses durará</small>
+            </div>
+
+            <div class="form-group" *ngIf="!expenseForm.es_permanente">
+              <label>Períodos restantes (cuotas) *</label>
+              <input
+                type="number"
+                [(ngModel)]="expenseForm.periodos_restantes"
+                placeholder="Ej: 12"
+                min="1"
+                class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label>Descripción (opcional)</label>
+              <textarea
+                [(ngModel)]="expenseForm.descripcion"
+                placeholder="Notas adicionales"
+                class="form-textarea"
+                rows="2"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" (click)="cancelExpenseForm()">Cancelar</button>
+              <button class="btn-primary" (click)="addExpense()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Lista de gastos -->
+          <div class="items-list">
+            <div *ngIf="getCurrentStepExpenses().length === 0" class="empty-hint">
+              No hay gastos fijos agregados
+            </div>
+            <div *ngFor="let expense of getCurrentStepExpenses(); let i = index" class="item-row">
+              <div class="item-info">
+                <strong>{{ getExpenseLabel(expense) }}</strong>
+                <small *ngIf="expense.descripcion">{{ expense.descripcion }}</small>
+              </div>
+              <div class="item-actions">
+                <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+                <button class="btn-delete" (click)="removeExpense(i)">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aportes -->
+        <div class="section">
+          <div class="section-header">
+            <h4>💰 Aportes</h4>
+            <button class="btn-small btn-primary" (click)="openAporteForm()">+ Agregar</button>
+          </div>
+
+          <!-- Formulario de aporte -->
+          <div *ngIf="showAporteForm()" class="inline-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="aporteForm.nombre"
+                  placeholder="Ej: Aporte pareja"
+                  class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  [(ngModel)]="aporteForm.monto"
+                  placeholder="0"
+                  class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="aporteForm.es_fijo">
+                <span>¿Es un aporte fijo?</span>
+              </label>
+              <small>Los aportes fijos se copian automáticamente cada período</small>
+            </div>
+
+            <div class="form-group">
+              <label>Descripción (opcional)</label>
+              <textarea
+                [(ngModel)]="aporteForm.descripcion"
+                placeholder="Notas adicionales"
+                class="form-textarea"
+                rows="2"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" (click)="cancelAporteForm()">Cancelar</button>
+              <button class="btn-primary" (click)="addAporte()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Lista de aportes -->
+          <div class="items-list">
+            <div *ngIf="getCurrentStepAportes().length === 0" class="empty-hint">
+              No hay aportes agregados
+            </div>
+            <div *ngFor="let aporte of getCurrentStepAportes(); let i = index" class="item-row aporte">
+              <div class="item-info">
+                <strong>{{ getAporteLabel(aporte) }}</strong>
+                <small *ngIf="aporte.descripcion">{{ aporte.descripcion }}</small>
+              </div>
+              <div class="item-actions">
+                <span class="item-amount positive">+{{ formatCurrency(aporte.monto) }}</span>
+                <button class="btn-delete" (click)="removeAporte(i)">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 3: ARRIENDO -->
+      <div *ngIf="currentStep() === 3" class="step-content">
+        <h3>🏠 Categoría: Arriendo</h3>
+        <p class="step-description">Define tus gastos fijos y aportes para arriendo</p>
+
+        <!-- Resumen de Arriendo -->
+        <div class="summary-card">
+          <div class="summary-row">
+            <span>Total Gastos Fijos:</span>
+            <strong>{{ formatCurrency(totalGastosFijosArriendo()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total Aportes:</span>
+            <strong class="positive">-{{ formatCurrency(totalAportesArriendo()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Meta de Arriendo (Real):</span>
+            <strong>{{ formatCurrency(totalRealArriendo()) }}</strong>
+          </div>
+        </div>
+
+        <!-- Gastos Fijos -->
+        <div class="section">
+          <div class="section-header">
+            <h4>🔄 Gastos Fijos</h4>
+            <button class="btn-small btn-primary" (click)="openExpenseForm()">+ Agregar</button>
+          </div>
+
+          <!-- Formulario de gasto (reutilizado) -->
+          <div *ngIf="showExpenseForm()" class="inline-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="expenseForm.nombre"
+                  placeholder="Ej: Arriendo, Agua, Luz"
+                  class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  [(ngModel)]="expenseForm.monto"
+                  placeholder="0"
+                  class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="expenseForm.es_permanente">
+                <span>¿Es permanente?</span>
+              </label>
+              <small>Si no es permanente, especifica cuántos meses durará</small>
+            </div>
+
+            <div class="form-group" *ngIf="!expenseForm.es_permanente">
+              <label>Períodos restantes (cuotas) *</label>
+              <input
+                type="number"
+                [(ngModel)]="expenseForm.periodos_restantes"
+                placeholder="Ej: 12"
+                min="1"
+                class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label>Descripción (opcional)</label>
+              <textarea
+                [(ngModel)]="expenseForm.descripcion"
+                placeholder="Notas adicionales"
+                class="form-textarea"
+                rows="2"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" (click)="cancelExpenseForm()">Cancelar</button>
+              <button class="btn-primary" (click)="addExpense()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Lista de gastos -->
+          <div class="items-list">
+            <div *ngIf="getCurrentStepExpenses().length === 0" class="empty-hint">
+              No hay gastos fijos agregados
+            </div>
+            <div *ngFor="let expense of getCurrentStepExpenses(); let i = index" class="item-row">
+              <div class="item-info">
+                <strong>{{ getExpenseLabel(expense) }}</strong>
+                <small *ngIf="expense.descripcion">{{ expense.descripcion }}</small>
+              </div>
+              <div class="item-actions">
+                <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+                <button class="btn-delete" (click)="removeExpense(i)">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aportes -->
+        <div class="section">
+          <div class="section-header">
+            <h4>💰 Aportes</h4>
+            <button class="btn-small btn-primary" (click)="openAporteForm()">+ Agregar</button>
+          </div>
+
+          <!-- Formulario de aporte (reutilizado) -->
+          <div *ngIf="showAporteForm()" class="inline-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="aporteForm.nombre"
+                  placeholder="Ej: Aporte pareja"
+                  class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  [(ngModel)]="aporteForm.monto"
+                  placeholder="0"
+                  class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="aporteForm.es_fijo">
+                <span>¿Es un aporte fijo?</span>
+              </label>
+              <small>Los aportes fijos se copian automáticamente cada período</small>
+            </div>
+
+            <div class="form-group">
+              <label>Descripción (opcional)</label>
+              <textarea
+                [(ngModel)]="aporteForm.descripcion"
+                placeholder="Notas adicionales"
+                class="form-textarea"
+                rows="2"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" (click)="cancelAporteForm()">Cancelar</button>
+              <button class="btn-primary" (click)="addAporte()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Lista de aportes -->
+          <div class="items-list">
+            <div *ngIf="getCurrentStepAportes().length === 0" class="empty-hint">
+              No hay aportes agregados
+            </div>
+            <div *ngFor="let aporte of getCurrentStepAportes(); let i = index" class="item-row aporte">
+              <div class="item-info">
+                <strong>{{ getAporteLabel(aporte) }}</strong>
+                <small *ngIf="aporte.descripcion">{{ aporte.descripcion }}</small>
+              </div>
+              <div class="item-actions">
+                <span class="item-amount positive">+{{ formatCurrency(aporte.monto) }}</span>
+                <button class="btn-delete" (click)="removeAporte(i)">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 4: CRÉDITO -->
+      <div *ngIf="currentStep() === 4" class="step-content">
+        <h3>💳 Categoría: Crédito</h3>
+        <p class="step-description">Define tus gastos fijos de crédito (cuotas, tarjetas, etc.)</p>
+
+        <!-- Resumen de Crédito -->
+        <div class="summary-card">
+          <div class="summary-row">
+            <span>Total Gastos Fijos:</span>
+            <strong>{{ formatCurrency(totalGastosFijosCredito()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Meta de Crédito:</span>
+            <strong>{{ formatCurrency(metaCredito()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Crédito Disponible:</span>
+            <strong [class.negative]="creditoDisponible() < 0">
+              {{ formatCurrency(creditoDisponible()) }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Presupuesto de Crédito *</label>
+          <input
+            type="number"
+            [(ngModel)]="metaCredito"
+            placeholder="0"
+            class="form-input">
+          <small>Cuánto dinero puedes destinar a créditos este mes</small>
+        </div>
+
+        <!-- Gastos Fijos -->
+        <div class="section">
+          <div class="section-header">
+            <h4>🔄 Gastos Fijos</h4>
+            <button class="btn-small btn-primary" (click)="openExpenseForm()">+ Agregar</button>
+          </div>
+
+          <!-- Formulario de gasto -->
+          <div *ngIf="showExpenseForm()" class="inline-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre *</label>
+                <input
+                  type="text"
+                  [(ngModel)]="expenseForm.nombre"
+                  placeholder="Ej: Cuota celular, Tarjeta Ripley"
+                  class="form-input">
+              </div>
+              <div class="form-group">
+                <label>Monto *</label>
+                <input
+                  type="number"
+                  [(ngModel)]="expenseForm.monto"
+                  placeholder="0"
+                  class="form-input">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input type="checkbox" [(ngModel)]="expenseForm.es_permanente">
+                <span>¿Es permanente?</span>
+              </label>
+              <small>Si no es permanente, especifica cuántos meses durará</small>
+            </div>
+
+            <div class="form-group" *ngIf="!expenseForm.es_permanente">
+              <label>Períodos restantes (cuotas) *</label>
+              <input
+                type="number"
+                [(ngModel)]="expenseForm.periodos_restantes"
+                placeholder="Ej: 12"
+                min="1"
+                class="form-input">
+            </div>
+
+            <div class="form-group">
+              <label>Descripción (opcional)</label>
+              <textarea
+                [(ngModel)]="expenseForm.descripcion"
+                placeholder="Notas adicionales"
+                class="form-textarea"
+                rows="2"></textarea>
+            </div>
+
+            <div class="form-actions">
+              <button class="btn-secondary" (click)="cancelExpenseForm()">Cancelar</button>
+              <button class="btn-primary" (click)="addExpense()">Agregar</button>
+            </div>
+          </div>
+
+          <!-- Lista de gastos -->
+          <div class="items-list">
+            <div *ngIf="getCurrentStepExpenses().length === 0" class="empty-hint">
+              No hay gastos fijos agregados
+            </div>
+            <div *ngFor="let expense of getCurrentStepExpenses(); let i = index" class="item-row">
+              <div class="item-info">
+                <strong>{{ getExpenseLabel(expense) }}</strong>
+                <small *ngIf="expense.descripcion">{{ expense.descripcion }}</small>
+              </div>
+              <div class="item-actions">
+                <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+                <button class="btn-delete" (click)="removeExpense(i)">🗑️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PASO 5: RESUMEN FINAL -->
+      <div *ngIf="currentStep() === 5" class="step-content">
+        <h3>📊 Resumen de Configuración</h3>
+        <p class="step-description">Revisa toda la información antes de guardar</p>
+
+        <!-- Datos Básicos -->
+        <div class="summary-section">
+          <h4>💰 Datos Básicos</h4>
+          <div class="summary-row">
+            <span>Sueldo:</span>
+            <strong>{{ formatCurrency(sueldo()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Deuda Crédito Anterior:</span>
+            <strong>{{ formatCurrency(creditoAnterior()) }}</strong>
+          </div>
+        </div>
+
+        <!-- Ahorro -->
+        <div class="summary-section">
+          <h4>🎯 Ahorro</h4>
+          <div class="summary-row">
+            <span>Gastos Fijos ({{ gastosFijosAhorro().length }}):</span>
+            <strong>{{ formatCurrency(totalGastosFijosAhorro()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Aportes ({{ aportesAhorro().length }}):</span>
+            <strong class="positive">-{{ formatCurrency(totalAportesAhorro()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Meta Ahorro:</span>
+            <strong>{{ formatCurrency(totalRealAhorro()) }}</strong>
+          </div>
+        </div>
+
+        <!-- Arriendo -->
+        <div class="summary-section">
+          <h4>🏠 Arriendo</h4>
+          <div class="summary-row">
+            <span>Gastos Fijos ({{ gastosFijosArriendo().length }}):</span>
+            <strong>{{ formatCurrency(totalGastosFijosArriendo()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Aportes ({{ aportesArriendo().length }}):</span>
+            <strong class="positive">-{{ formatCurrency(totalAportesArriendo()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Meta Arriendo:</span>
+            <strong>{{ formatCurrency(totalRealArriendo()) }}</strong>
+          </div>
+        </div>
+
+        <!-- Crédito -->
+        <div class="summary-section">
+          <h4>💳 Crédito</h4>
+          <div class="summary-row">
+            <span>Presupuesto:</span>
+            <strong>{{ formatCurrency(metaCredito()) }}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Gastos Fijos ({{ gastosFijosCredito().length }}):</span>
+            <strong>{{ formatCurrency(totalGastosFijosCredito()) }}</strong>
+          </div>
+          <div class="summary-row total">
+            <span>Disponible:</span>
+            <strong [class.negative]="creditoDisponible() < 0">
+              {{ formatCurrency(creditoDisponible()) }}
+            </strong>
+          </div>
+        </div>
+
+        <!-- Liquidez Calculada -->
+        <div class="summary-section highlight">
+          <h4>💵 Liquidez Calculada</h4>
+          <div class="liquidez-formula">
+            <p>Sueldo - Meta Ahorro - Total Arriendo - Crédito Anterior</p>
+            <p>{{ formatCurrency(sueldo()) }} - {{ formatCurrency(metaAhorro()) }} - {{ formatCurrency(totalRealArriendo()) }} - {{ formatCurrency(creditoAnterior()) }}</p>
+          </div>
+          <div class="summary-row total">
+            <span>LIQUIDEZ:</span>
+            <strong [class.negative]="liquidezCalculada() < 0">
+              {{ formatCurrency(liquidezCalculada()) }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="alert-info" *ngIf="liquidezCalculada() < 0">
+          ⚠️ Tu liquidez es negativa. Revisa tus metas y gastos para ajustar el presupuesto.
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Footer con navegación -->
+    <div class="modal-footer">
+      <button
+        class="btn-secondary"
+        (click)="prevStep()"
+        [disabled]="currentStep() === 1">
+        ← Anterior
+      </button>
+
+      <button
+        *ngIf="currentStep() < totalSteps"
+        class="btn-primary"
+        (click)="nextStep()"
+        [disabled]="!canProceed()">
+        Siguiente →
+      </button>
+
+      <button
+        *ngIf="currentStep() === totalSteps"
+        class="btn-primary"
+        (click)="saveConfiguration()"
+        [disabled]="isLoading()">
+        {{ isLoading() ? 'Guardando...' : '✓ Guardar Configuración' }}
+      </button>
+    </div>
+
+  </div>
+</div>

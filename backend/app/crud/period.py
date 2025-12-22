@@ -35,6 +35,7 @@ class PeriodCRUD:
         aporte_crud=None
     ):
         self.collection = db["periods"]
+        self.db = db  # Guardar referencia a la base de datos para acceder a otras colecciones
         self.expense_crud = expense_crud
         self.aporte_crud = aporte_crud
 
@@ -153,6 +154,16 @@ class PeriodCRUD:
     # LÓGICA DE CREACIÓN AUTOMÁTICA
     # ====================
 
+    async def _get_user_categories(self, user_id: str) -> List[ObjectId]:
+        """
+        Obtener los IDs de las 4 categorías del usuario
+        """
+        categories = await self.db["categories"].find(
+            {"user_id": ObjectId(user_id)}
+        ).to_list(length=None)
+
+        return [cat["_id"] for cat in categories]
+
     async def _create_current_period(
         self,
         user_id: str,
@@ -163,9 +174,10 @@ class PeriodCRUD:
 
         Flujo:
         1. Calcular fechas según tipo de período
-        2. Buscar período anterior cerrado
-        3. Si existe anterior, copiar gastos/aportes fijos
-        4. Si es período mensual y existe período de crédito cerrado, obtener deuda
+        2. Obtener categorías del usuario
+        3. Buscar período anterior cerrado
+        4. Si existe anterior, copiar gastos/aportes fijos
+        5. Si es período mensual y existe período de crédito cerrado, obtener deuda
         """
         now = datetime.utcnow()
 
@@ -173,6 +185,9 @@ class PeriodCRUD:
             fecha_inicio, fecha_fin = self._calculate_mensual_dates(now)
         else:  # CICLO_CREDITO
             fecha_inicio, fecha_fin = self._calculate_credito_dates(now)
+
+        # Obtener categorías del usuario
+        categorias = await self._get_user_categories(user_id)
 
         # Buscar período anterior
         previous_period = await self._get_previous_period(user_id, tipo_periodo)
@@ -186,15 +201,19 @@ class PeriodCRUD:
             "sueldo": 0,
             "metas_categorias": MetasCategorias().model_dump(),
             "estado": EstadoPeriodo.ACTIVO,
+            "categorias": categorias,  # Añadir referencias a las 4 categorías
             "total_gastado": 0,
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow()
         }
 
-        # Si hay período anterior, copiar metas y sueldo
+        # Si hay período anterior, copiar metas, sueldo y categorías
         if previous_period:
             period_dict["sueldo"] = previous_period.sueldo
             period_dict["metas_categorias"] = previous_period.metas_categorias.model_dump()
+            # Si el período anterior tiene categorías, usarlas (para compatibilidad)
+            if hasattr(previous_period, 'categorias') and previous_period.categorias:
+                period_dict["categorias"] = previous_period.categorias
 
         result = await self.collection.insert_one(period_dict)
         period_dict["_id"] = result.inserted_id

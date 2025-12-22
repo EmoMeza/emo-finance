@@ -2,146 +2,192 @@ import { Injectable, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../environments/environment';
-
-export enum TipoPeriodo {
-  MENSUAL_ESTANDAR = 'mensual_estandar',
-  CICLO_CREDITO = 'ciclo_credito'
-}
-
-export enum EstadoPeriodo {
-  ACTIVO = 'activo',
-  CERRADO = 'cerrado',
-  PROYECTADO = 'proyectado'
-}
-
-export interface MetasCategorias {
-  ahorro: number;
-  arriendo: number;
-  credito_usable: number;
-}
-
-export interface Period {
-  _id: string;
-  user_id: string;
-  tipo_periodo: TipoPeriodo;
-  fecha_inicio: string;
-  fecha_fin: string;
-  sueldo: number;
-  metas_categorias: MetasCategorias;
-  estado: EstadoPeriodo;
-  total_gastado: number;
-  liquido_calculado: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface PeriodCreate {
-  tipo_periodo: TipoPeriodo;
-  fecha_inicio: string;
-  fecha_fin: string;
-  sueldo: number;
-  metas_categorias: MetasCategorias;
-  estado?: EstadoPeriodo;
-}
-
-export interface PeriodUpdate {
-  sueldo?: number;
-  metas_categorias?: MetasCategorias;
-  estado?: EstadoPeriodo;
-  total_gastado?: number;
-}
+import {
+  Period,
+  PeriodCreate,
+  PeriodUpdate,
+  PeriodSummary,
+  TipoPeriodo,
+  EstadoPeriodo
+} from '../models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class PeriodService {
-  private readonly API_URL = environment.apiUrl;
+  private readonly API_URL = `${environment.apiUrl}/periods`;
 
-  // Signal para el período activo
-  activePeriod = signal<Period | null>(null);
+  // Signals for reactive periods state
   periods = signal<Period[]>([]);
+  activeMensualPeriod = signal<Period | null>(null);
+  activeCreditPeriod = signal<Period | null>(null);
+  currentSummary = signal<PeriodSummary | null>(null);
+  isLoading = signal<boolean>(false);
 
   constructor(private http: HttpClient) {}
 
-  createPeriod(periodData: PeriodCreate): Observable<Period> {
-    return this.http.post<Period>(`${this.API_URL}/periods/`, periodData).pipe(
+  /**
+   * Obtener el período activo de un tipo específico
+   * Si no existe, se crea automáticamente
+   */
+  getActivePeriod(tipoPeriodo: TipoPeriodo): Observable<Period> {
+    this.isLoading.set(true);
+
+    const params = new HttpParams().set('tipo_periodo', tipoPeriodo);
+
+    return this.http.get<Period>(`${this.API_URL}/active`, { params }).pipe(
       tap(period => {
-        if (period.estado === EstadoPeriodo.ACTIVO) {
-          this.activePeriod.set(period);
+        if (tipoPeriodo === TipoPeriodo.MENSUAL_ESTANDAR) {
+          this.activeMensualPeriod.set(period);
+        } else {
+          this.activeCreditPeriod.set(period);
         }
+        this.isLoading.set(false);
       })
     );
   }
 
+  /**
+   * Obtener todos los períodos con filtros opcionales
+   */
   getPeriods(
-    skip: number = 0,
-    limit: number = 10,
-    estado?: EstadoPeriodo,
-    tipoPeriodo?: TipoPeriodo
+    tipoPeriodo?: TipoPeriodo,
+    estado?: EstadoPeriodo
   ): Observable<Period[]> {
-    let params = new HttpParams()
-      .set('skip', skip.toString())
-      .set('limit', limit.toString());
+    this.isLoading.set(true);
+
+    let params = new HttpParams();
+
+    if (tipoPeriodo) {
+      params = params.set('tipo_periodo', tipoPeriodo);
+    }
 
     if (estado) {
       params = params.set('estado', estado);
     }
-    if (tipoPeriodo) {
-      params = params.set('tipo_periodo', tipoPeriodo);
+
+    return this.http.get<Period[]>(this.API_URL, { params }).pipe(
+      tap(periods => {
+        this.periods.set(periods);
+        this.isLoading.set(false);
+      })
+    );
+  }
+
+  /**
+   * Obtener un período por ID
+   */
+  getPeriodById(id: string): Observable<Period> {
+    return this.http.get<Period>(`${this.API_URL}/${id}`);
+  }
+
+  /**
+   * Obtener resumen completo del período con todas las categorías
+   */
+  getPeriodSummary(id: string): Observable<PeriodSummary> {
+    this.isLoading.set(true);
+
+    return this.http.get<PeriodSummary>(`${this.API_URL}/${id}/summary`).pipe(
+      tap(summary => {
+        this.currentSummary.set(summary);
+        this.isLoading.set(false);
+      })
+    );
+  }
+
+  /**
+   * Crear un nuevo período manualmente
+   */
+  createPeriod(period: PeriodCreate): Observable<Period> {
+    return this.http.post<Period>(this.API_URL, period).pipe(
+      tap(newPeriod => {
+        this.periods.update(pers => [...pers, newPeriod]);
+      })
+    );
+  }
+
+  /**
+   * Actualizar un período
+   */
+  updatePeriod(id: string, updates: PeriodUpdate): Observable<Period> {
+    return this.http.put<Period>(`${this.API_URL}/${id}`, updates).pipe(
+      tap(updatedPeriod => {
+        this.periods.update(pers =>
+          pers.map(per => per._id === id ? updatedPeriod : per)
+        );
+
+        // Actualizar período activo si corresponde
+        if (updatedPeriod.tipo_periodo === TipoPeriodo.MENSUAL_ESTANDAR &&
+            updatedPeriod.estado === EstadoPeriodo.ACTIVO) {
+          this.activeMensualPeriod.set(updatedPeriod);
+        } else if (updatedPeriod.tipo_periodo === TipoPeriodo.CICLO_CREDITO &&
+                   updatedPeriod.estado === EstadoPeriodo.ACTIVO) {
+          this.activeCreditPeriod.set(updatedPeriod);
+        }
+      })
+    );
+  }
+
+  /**
+   * Cerrar un período
+   */
+  closePeriod(id: string): Observable<Period> {
+    return this.http.post<Period>(`${this.API_URL}/${id}/close`, {}).pipe(
+      tap(closedPeriod => {
+        this.periods.update(pers =>
+          pers.map(per => per._id === id ? closedPeriod : per)
+        );
+
+        // Limpiar período activo si corresponde
+        if (closedPeriod.tipo_periodo === TipoPeriodo.MENSUAL_ESTANDAR) {
+          this.activeMensualPeriod.set(null);
+        } else {
+          this.activeCreditPeriod.set(null);
+        }
+      })
+    );
+  }
+
+  /**
+   * Eliminar un período
+   */
+  deletePeriod(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.API_URL}/${id}`).pipe(
+      tap(() => {
+        this.periods.update(pers => pers.filter(per => per._id !== id));
+      })
+    );
+  }
+
+  /**
+   * Inicializar períodos activos (mensual y crédito)
+   */
+  initializeActivePeriods(): void {
+    this.getActivePeriod(TipoPeriodo.MENSUAL_ESTANDAR).subscribe();
+    this.getActivePeriod(TipoPeriodo.CICLO_CREDITO).subscribe();
+  }
+
+  /**
+   * Calcular liquidez según LOGICA_SISTEMA.md
+   * liquidez = sueldo - meta_ahorro - total_arriendo_real - credito_periodo_anterior
+   */
+  calculateLiquidez(summary: PeriodSummary): number {
+    return summary.liquidez_calculada;
+  }
+
+  /**
+   * Calcular crédito disponible real
+   * credito_usable_real = meta_credito - total_gastos_credito + total_aportes_credito
+   */
+  calculateCreditoDisponible(summary: PeriodSummary): number {
+    const creditoCategory = summary.categories_summary.find(
+      cat => cat.categoria_slug === 'credito'
+    );
+
+    if (!creditoCategory || !creditoCategory.meta) {
+      return 0;
     }
 
-    return this.http.get<Period[]>(`${this.API_URL}/periods/`, { params }).pipe(
-      tap(periods => this.periods.set(periods))
-    );
-  }
-
-  getActivePeriod(tipoPeriodo?: TipoPeriodo): Observable<Period> {
-    let params = new HttpParams();
-    if (tipoPeriodo) {
-      params = params.set('tipo_periodo', tipoPeriodo);
-    }
-
-    return this.http.get<Period>(`${this.API_URL}/periods/active`, { params }).pipe(
-      tap(period => this.activePeriod.set(period))
-    );
-  }
-
-  getPeriodById(periodId: string): Observable<Period> {
-    return this.http.get<Period>(`${this.API_URL}/periods/${periodId}`);
-  }
-
-  updatePeriod(periodId: string, updateData: PeriodUpdate): Observable<Period> {
-    return this.http.put<Period>(`${this.API_URL}/periods/${periodId}`, updateData).pipe(
-      tap(period => {
-        if (period.estado === EstadoPeriodo.ACTIVO) {
-          this.activePeriod.set(period);
-        }
-      })
-    );
-  }
-
-  closePeriod(periodId: string): Observable<Period> {
-    return this.http.post<Period>(`${this.API_URL}/periods/${periodId}/close`, {}).pipe(
-      tap(() => {
-        // Si cerramos el período activo, limpiar signal
-        if (this.activePeriod()?._id === periodId) {
-          this.activePeriod.set(null);
-        }
-      })
-    );
-  }
-
-  deletePeriod(periodId: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/periods/${periodId}`).pipe(
-      tap(() => {
-        if (this.activePeriod()?._id === periodId) {
-          this.activePeriod.set(null);
-        }
-      })
-    );
-  }
-
-  calculateLiquido(sueldo: number, metas: MetasCategorias): number {
-    return sueldo - metas.ahorro - metas.arriendo - metas.credito_usable;
+    return creditoCategory.meta - creditoCategory.total_real;
   }
 }

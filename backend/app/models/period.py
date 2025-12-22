@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 from bson import ObjectId
 from enum import Enum
@@ -30,15 +30,13 @@ class EstadoPeriodo(str, Enum):
 
 class MetasCategorias(BaseModel):
     """
-    Metas/presupuestos para cada categoría
+    Metas/presupuestos para categorías que lo requieren
     Según LOGICA_SISTEMA.md:
-    - ahorro: Meta mensual de ahorro
-    - arriendo: Presupuesto para vivienda
-    - credito_usable: Meta de crédito total del período
+    - credito_usable: Meta/límite de crédito del período (única categoría con meta)
+
+    NOTA: Ahorro y Arriendo NO tienen meta, se calculan como suma de gastos - aportes
     """
-    ahorro: float = Field(default=0, ge=0, description="Meta mensual de ahorro")
-    arriendo: float = Field(default=0, ge=0, description="Presupuesto para arriendo y gastos relacionados")
-    credito_usable: float = Field(default=0, ge=0, description="Meta de crédito total del período")
+    credito_usable: float = Field(default=0, ge=0, description="Meta/límite de crédito del período")
 
 
 class PeriodBase(BaseModel):
@@ -51,6 +49,12 @@ class PeriodBase(BaseModel):
     sueldo: Optional[float] = Field(default=0, ge=0, description="Ingreso mensual (solo para períodos mensuales)")
     metas_categorias: MetasCategorias = Field(default_factory=MetasCategorias)
     estado: EstadoPeriodo = EstadoPeriodo.ACTIVO
+
+    # Referencias a las 4 categorías del sistema
+    categorias: List[PyObjectId] = Field(
+        default_factory=list,
+        description="Array con los IDs de las 4 categorías (Ahorro, Arriendo, Crédito, Liquidez)"
+    )
 
     # Solo para períodos de crédito
     total_gastado: Optional[float] = Field(
@@ -119,6 +123,7 @@ class PeriodResponse(BaseModel):
     sueldo: float
     metas_categorias: MetasCategorias
     estado: EstadoPeriodo
+    categorias: List[str] = Field(default_factory=list, description="IDs de las 4 categorías del período")
     total_gastado: float
     created_at: datetime
     updated_at: datetime

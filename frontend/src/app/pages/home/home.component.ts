@@ -3,44 +3,80 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
-import { PeriodService, Period, TipoPeriodo } from '../../services/period.service';
-import { CategoryService, TipoCategoria } from '../../services/category.service';
+import { PeriodService } from '../../services/period.service';
+import { CategoryService } from '../../services/category.service';
 import { ExpenseService } from '../../services/expense.service';
+import { Period, TipoPeriodo, Category } from '../../models';
+import { InitialSetupModalComponent } from '../../components/initial-setup-modal/initial-setup-modal.component';
+import { CategoryDetailModalComponent } from '../../components/category-detail-modal/category-detail-modal.component';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, InitialSetupModalComponent, CategoryDetailModalComponent],
   templateUrl: './home.component.html',
   styleUrl: './home.component.css'
 })
 export class HomeComponent implements OnInit {
   isLoading = signal(true);
   error = signal('');
-  showConfigModal = signal(false);
+  showInitialSetupModal = signal(false);
+  showCategoryModal = signal(false);
+  selectedCategory = signal<Category | null>(null);
+  selectedCategoryMeta = signal<number | undefined>(undefined);
+  selectedPeriodId = signal<string>('');
   creditPeriod = signal<Period | null>(null);
   isFirstTimeSetup = signal(false);
 
   // Computed signals para las 4 categorías
   ahorroCategory = computed(() =>
-    this.categoryService.getCategoryByType(TipoCategoria.AHORRO)
+    this.categoryService.getAhorroCategory()
   );
   arriendoCategory = computed(() =>
-    this.categoryService.getCategoryByType(TipoCategoria.ARRIENDO)
+    this.categoryService.getArriendoCategory()
   );
   creditoCategory = computed(() =>
-    this.categoryService.getCategoryByType(TipoCategoria.CREDITO)
+    this.categoryService.getCreditoCategory()
   );
   liquidoCategory = computed(() =>
-    this.categoryService.getCategoryByType(TipoCategoria.LIQUIDO)
+    this.categoryService.getLiquidezCategory()
   );
 
-  // Computed para los valores de las categorías desde el período activo
-  ahorro = computed(() => this.periodService.activePeriod()?.metas_categorias.ahorro ?? 0);
-  arriendo = computed(() => this.periodService.activePeriod()?.metas_categorias.arriendo ?? 0);
-  creditoUsable = computed(() => this.periodService.activePeriod()?.metas_categorias.credito_usable ?? 0);
-  liquido = computed(() => this.periodService.activePeriod()?.liquido_calculado ?? 0);
-  sueldo = computed(() => this.periodService.activePeriod()?.sueldo ?? 0);
+  // Computed para obtener resúmenes de categorías desde el period summary
+  ahorroSummary = computed(() =>
+    this.periodService.currentSummary()?.categories_summary.find(
+      c => c.categoria_slug === 'ahorro'
+    )
+  );
+
+  arriendoSummary = computed(() =>
+    this.periodService.currentSummary()?.categories_summary.find(
+      c => c.categoria_slug === 'arriendo'
+    )
+  );
+
+  creditoSummary = computed(() =>
+    this.periodService.currentSummary()?.categories_summary.find(
+      c => c.categoria_slug === 'credito'
+    )
+  );
+
+  liquidoSummary = computed(() =>
+    this.periodService.currentSummary()?.categories_summary.find(
+      c => c.categoria_slug === 'liquidez'
+    )
+  );
+
+  // Computed para los valores de las categorías (total real)
+  ahorro = computed(() => this.ahorroSummary()?.total_real ?? 0);
+  arriendo = computed(() => this.arriendoSummary()?.total_real ?? 0);
+  creditoUsable = computed(() => this.creditoSummary()?.total_real ?? 0);
+  liquido = computed(() => this.periodService.currentSummary()?.liquidez_calculada ?? 0);
+  sueldo = computed(() => this.periodService.activeMensualPeriod()?.sueldo ?? 0);
+
+  // Computed para metas de categorías
+  // NOTA: Solo Crédito tiene meta real. Ahorro y Arriendo usan total_real
+  metaCredito = computed(() => this.creditoSummary()?.meta ?? 0);
 
   // Computed para porcentajes
   porcentajeAhorro = computed(() => this.calculatePercentage(this.ahorro()));
@@ -50,22 +86,8 @@ export class HomeComponent implements OnInit {
 
   // Computed para detectar si el período está sin configurar
   isPeriodUnconfigured = computed(() => {
-    const period = this.periodService.activePeriod();
+    const period = this.periodService.activeMensualPeriod();
     return period && period.sueldo === 0;
-  });
-
-  // Valores del formulario de configuración
-  configForm = {
-    sueldo: 0,
-    ahorro: 0,
-    arriendo: 0,
-    credito: 0,
-    deudaCreditoAnterior: 0  // Para usuarios nuevos: deuda del período de crédito anterior
-  };
-
-  // Computed para líquido calculado en tiempo real en el modal
-  liquidoPreview = computed(() => {
-    return this.configForm.sueldo - this.configForm.ahorro - this.configForm.arriendo - this.configForm.deudaCreditoAnterior;
   });
 
   constructor(
@@ -94,13 +116,13 @@ export class HomeComponent implements OnInit {
       await this.loadCreditPeriod();
 
       // Detectar si es la primera vez (período sin configurar Y período de crédito con total_gastado = 0)
-      const period = this.periodService.activePeriod();
+      const period = this.periodService.activeMensualPeriod();
       const credit = this.creditPeriod();
       this.isFirstTimeSetup.set(period?.sueldo === 0 && credit?.total_gastado === 0);
 
       // Si el período está sin configurar (sueldo = 0), mostrar modal automáticamente
       if (this.isPeriodUnconfigured()) {
-        this.openConfigModal();
+        this.openInitialSetupModal();
       }
 
       this.isLoading.set(false);
@@ -117,9 +139,9 @@ export class HomeComponent implements OnInit {
         next: (categories) => {
           // Si no hay categorías, inicializar las predeterminadas
           if (categories.length === 0) {
-            this.categoryService.initializeDefaultCategories().subscribe({
+            this.categoryService.initDefaultCategories().subscribe({
               next: () => resolve(),
-              error: (err) => reject(err)
+              error: (err: any) => reject(err)
             });
           } else {
             resolve();
@@ -133,7 +155,20 @@ export class HomeComponent implements OnInit {
   private loadActivePeriod(): Promise<void> {
     return new Promise((resolve, reject) => {
       this.periodService.getActivePeriod(TipoPeriodo.MENSUAL_ESTANDAR).subscribe({
-        next: () => resolve(),
+        next: (period) => {
+          // Cargar resumen del período con totales reales de categorías
+          if (period) {
+            this.periodService.getPeriodSummary(period._id).subscribe({
+              next: () => resolve(),
+              error: (err) => {
+                console.warn('Error loading period summary:', err);
+                resolve(); // No es crítico si falla el summary
+              }
+            });
+          } else {
+            resolve();
+          }
+        },
         error: (err) => reject(err)
       });
     });
@@ -168,55 +203,84 @@ export class HomeComponent implements OnInit {
     }).format(value);
   }
 
-  openConfigModal() {
-    // Inicializar valores del formulario con los actuales del período
-    const period = this.periodService.activePeriod();
-    if (period) {
-      this.configForm.sueldo = period.sueldo;
-      this.configForm.ahorro = period.metas_categorias.ahorro;
-      this.configForm.arriendo = period.metas_categorias.arriendo;
-      this.configForm.credito = period.metas_categorias.credito_usable;
-    }
-    this.showConfigModal.set(true);
+  // ==================
+  // INITIAL SETUP MODAL
+  // ==================
+
+  openInitialSetupModal() {
+    this.showInitialSetupModal.set(true);
   }
 
-  closeConfigModal() {
-    this.showConfigModal.set(false);
+  closeInitialSetupModal() {
+    this.showInitialSetupModal.set(false);
   }
 
-  async savePeriodConfig() {
-    const period = this.periodService.activePeriod();
-    if (!period) return;
-
+  async onInitialSetupComplete() {
     try {
-      // Actualizar período mensual
-      await this.periodService.updatePeriod(period._id, {
-        sueldo: this.configForm.sueldo,
-        metas_categorias: {
-          ahorro: this.configForm.ahorro,
-          arriendo: this.configForm.arriendo,
-          credito_usable: this.configForm.credito
-        }
-      }).toPromise();
-
-      // Si es primera vez, actualizar el período de crédito con la deuda anterior
-      if (this.isFirstTimeSetup() && this.creditPeriod()) {
-        await this.periodService.updatePeriod(this.creditPeriod()!._id, {
-          total_gastado: this.configForm.deudaCreditoAnterior
-        }).toPromise();
-      }
-
-      this.closeConfigModal();
-      // Recargar para obtener los períodos actualizados
+      // Recargar datos del dashboard (esto también carga el summary)
       await this.loadActivePeriod();
       await this.loadCreditPeriod();
+
+      // Cerrar modal solo después de recargar todos los datos
+      this.closeInitialSetupModal();
     } catch (err: any) {
-      console.error('Error saving period config:', err);
-      this.error.set(err.error?.detail || 'Error al guardar la configuración');
+      console.error('Error reloading dashboard after setup:', err);
+      this.error.set('Error al recargar el dashboard');
+      this.closeInitialSetupModal();
     }
   }
 
-  calculatePercentagePreview(value: number): number {
-    return this.configForm.sueldo > 0 ? Math.round((value / this.configForm.sueldo) * 100) : 0;
+  // ==================
+  // CATEGORY DETAIL MODAL
+  // ==================
+
+  openCategoryModal(category: Category, periodId: string, meta?: number) {
+    this.selectedCategory.set(category);
+    this.selectedCategoryMeta.set(meta);
+    this.selectedPeriodId.set(periodId);
+    this.showCategoryModal.set(true);
+  }
+
+  closeCategoryModal() {
+    this.showCategoryModal.set(false);
+    this.selectedCategory.set(null);
+    this.selectedCategoryMeta.set(undefined);
+    this.selectedPeriodId.set('');
+  }
+
+  // Métodos auxiliares para abrir modales de categorías específicas
+  openAhorroModal() {
+    const category = this.ahorroCategory();
+    const periodId = this.periodService.activeMensualPeriod()?._id;
+    if (category && periodId) {
+      // Ahorro NO tiene meta, se calcula como suma de gastos - aportes
+      this.openCategoryModal(category, periodId, undefined);
+    }
+  }
+
+  openArriendoModal() {
+    const category = this.arriendoCategory();
+    const periodId = this.periodService.activeMensualPeriod()?._id;
+    if (category && periodId) {
+      // Arriendo NO tiene meta, se calcula como suma de gastos - aportes
+      this.openCategoryModal(category, periodId, undefined);
+    }
+  }
+
+  openCreditoModal() {
+    const category = this.creditoCategory();
+    const periodId = this.creditPeriod()?._id; // Usa período de crédito
+    if (category && periodId) {
+      this.openCategoryModal(category, periodId, this.metaCredito());
+    }
+  }
+
+  openLiquidoModal() {
+    const category = this.liquidoCategory();
+    const periodId = this.periodService.activeMensualPeriod()?._id;
+    if (category && periodId) {
+      // Liquidez no tiene meta fija, se calcula automáticamente
+      this.openCategoryModal(category, periodId, undefined);
+    }
   }
 }

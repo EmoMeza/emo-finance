@@ -175,9 +175,31 @@
   border: 2px solid transparent;
 }
 
-.category-card:hover {
+.category-card.clickable {
+  cursor: pointer;
+}
+
+.category-card.clickable:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-footer {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.view-details {
+  color: #667eea;
+  font-size: 0.875rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.category-card.clickable:hover .view-details {
+  opacity: 1;
 }
 
 /* Ahorro - Purple */
