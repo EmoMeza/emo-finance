@@ -73,7 +73,7 @@ class AporteCRUD:
             query["es_fijo"] = es_fijo
 
         if categoria_id:
-            query["categoria_id"] = ObjectId(categoria_id)
+            query["categoria_id"] = categoria_id  # Comparar como string, no como ObjectId
 
         cursor = self.collection.find(query)
         aportes = await cursor.to_list(length=None)
@@ -152,7 +152,7 @@ class AporteCRUD:
                 "$match": {
                     "user_id": ObjectId(user_id),
                     "periodo_id": ObjectId(periodo_id),
-                    "categoria_id": ObjectId(categoria_id)
+                    "categoria_id": categoria_id  # Comparar como string, no como ObjectId
                 }
             },
             {

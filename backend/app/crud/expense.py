@@ -71,7 +71,7 @@ class ExpenseCRUD:
             query["tipo"] = tipo
 
         if categoria_id:
-            query["categoria_id"] = ObjectId(categoria_id)
+            query["categoria_id"] = categoria_id  # Comparar como string, no como ObjectId
 
         cursor = self.collection.find(query)
         expenses = await cursor.to_list(length=None)
@@ -165,12 +165,24 @@ class ExpenseCRUD:
         Calcular el total de gastos de una categoría en un período
         Suma de todos los gastos (fijos + variables)
         """
+        # DEBUG: Log de búsqueda
+        print(f"DEBUG EXPENSE: Buscando gastos con user_id={user_id}, periodo_id={periodo_id}, categoria_id={categoria_id}")
+
+        # Primero verificar cuántos gastos hay en total para este período
+        total_count = await self.collection.count_documents({"periodo_id": ObjectId(periodo_id)})
+        print(f"DEBUG EXPENSE: Total gastos en periodo {periodo_id}: {total_count}")
+
+        # Ver un ejemplo de gasto para comparar
+        sample = await self.collection.find_one({"periodo_id": ObjectId(periodo_id)})
+        if sample:
+            print(f"DEBUG EXPENSE: Ejemplo de gasto: user_id={sample.get('user_id')} (tipo: {type(sample.get('user_id'))}), categoria_id={sample.get('categoria_id')} (tipo: {type(sample.get('categoria_id'))}), monto={sample.get('monto')}")
+
         pipeline = [
             {
                 "$match": {
                     "user_id": ObjectId(user_id),
                     "periodo_id": ObjectId(periodo_id),
-                    "categoria_id": ObjectId(categoria_id)
+                    "categoria_id": categoria_id  # Comparar como string, no como ObjectId
                 }
             },
             {
@@ -182,6 +194,8 @@ class ExpenseCRUD:
         ]
 
         result = await self.collection.aggregate(pipeline).to_list(length=1)
+
+        print(f"DEBUG EXPENSE: Resultado agregación: {result}")
 
         return result[0]["total"] if result else 0.0
 

@@ -89,6 +89,8 @@ export class PeriodService {
 
     return this.http.get<PeriodSummary>(`${this.API_URL}/${id}/summary`).pipe(
       tap(summary => {
+        console.log('DEBUG: PeriodSummary recibido del backend:', summary);
+        console.log('DEBUG: categories_summary:', summary.categories_summary);
         this.currentSummary.set(summary);
         this.isLoading.set(false);
       })

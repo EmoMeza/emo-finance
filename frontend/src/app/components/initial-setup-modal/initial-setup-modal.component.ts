@@ -176,13 +176,11 @@ export class InitialSetupModalComponent {
   }
 
   resetExpenseForm() {
-    this.expenseForm = {
-      nombre: '',
-      monto: 0,
-      es_permanente: true,
-      periodos_restantes: 0,
-      descripcion: ''
-    };
+    this.expenseForm.nombre = '';
+    this.expenseForm.monto = 0;
+    this.expenseForm.es_permanente = true;
+    this.expenseForm.periodos_restantes = 0;
+    this.expenseForm.descripcion = '';
   }
 
   cancelExpenseForm() {
@@ -234,12 +232,10 @@ export class InitialSetupModalComponent {
   }
 
   resetAporteForm() {
-    this.aporteForm = {
-      nombre: '',
-      monto: 0,
-      es_fijo: true,
-      descripcion: ''
-    };
+    this.aporteForm.nombre = '';
+    this.aporteForm.monto = 0;
+    this.aporteForm.es_fijo = true;
+    this.aporteForm.descripcion = '';
   }
 
   cancelAporteForm() {
@@ -311,6 +307,7 @@ export class InitialSetupModalComponent {
       }).toPromise();
 
       // 4. Crear gastos fijos de Ahorro
+      console.log('DEBUG: Creando gastos de Ahorro:', this.gastosFijosAhorro());
       await this.createExpensesForCategory(
         mensualPeriod._id,
         this.ahorroCategory()?._id!,
@@ -318,6 +315,7 @@ export class InitialSetupModalComponent {
       );
 
       // 5. Crear aportes de Ahorro
+      console.log('DEBUG: Creando aportes de Ahorro:', this.aportesAhorro());
       await this.createAportesForCategory(
         mensualPeriod._id,
         this.ahorroCategory()?._id!,

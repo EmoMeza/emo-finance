@@ -68,10 +68,26 @@ export class HomeComponent implements OnInit {
   );
 
   // Computed para los valores de las categorías (total real)
-  ahorro = computed(() => this.ahorroSummary()?.total_real ?? 0);
-  arriendo = computed(() => this.arriendoSummary()?.total_real ?? 0);
-  creditoUsable = computed(() => this.creditoSummary()?.total_real ?? 0);
-  liquido = computed(() => this.periodService.currentSummary()?.liquidez_calculada ?? 0);
+  ahorro = computed(() => {
+    const summary = this.ahorroSummary();
+    console.log('DEBUG: ahorroSummary', summary);
+    return summary?.total_real ?? 0;
+  });
+  arriendo = computed(() => {
+    const summary = this.arriendoSummary();
+    console.log('DEBUG: arriendoSummary', summary);
+    return summary?.total_real ?? 0;
+  });
+  creditoUsable = computed(() => {
+    const summary = this.creditoSummary();
+    console.log('DEBUG: creditoSummary', summary);
+    return summary?.total_real ?? 0;
+  });
+  liquido = computed(() => {
+    const liquidez = this.periodService.currentSummary()?.liquidez_calculada ?? 0;
+    console.log('DEBUG: liquidez_calculada', liquidez);
+    return liquidez;
+  });
   sueldo = computed(() => this.periodService.activeMensualPeriod()?.sueldo ?? 0);
 
   // Computed para metas de categorías
@@ -217,16 +233,14 @@ export class HomeComponent implements OnInit {
 
   async onInitialSetupComplete() {
     try {
-      // Recargar datos del dashboard (esto también carga el summary)
-      await this.loadActivePeriod();
-      await this.loadCreditPeriod();
-
-      // Cerrar modal solo después de recargar todos los datos
+      // Cerrar modal primero
       this.closeInitialSetupModal();
+
+      // Recargar TODO el dashboard para refrescar los datos
+      await this.loadDashboardData();
     } catch (err: any) {
       console.error('Error reloading dashboard after setup:', err);
       this.error.set('Error al recargar el dashboard');
-      this.closeInitialSetupModal();
     }
   }
 
@@ -241,11 +255,19 @@ export class HomeComponent implements OnInit {
     this.showCategoryModal.set(true);
   }
 
-  closeCategoryModal() {
+  async closeCategoryModal() {
     this.showCategoryModal.set(false);
     this.selectedCategory.set(null);
     this.selectedCategoryMeta.set(undefined);
     this.selectedPeriodId.set('');
+
+    // Recargar el summary para actualizar los totales en el dashboard
+    const period = this.periodService.activeMensualPeriod();
+    if (period) {
+      this.periodService.getPeriodSummary(period._id).subscribe({
+        error: (err) => console.error('Error reloading summary:', err)
+      });
+    }
   }
 
   // Métodos auxiliares para abrir modales de categorías específicas

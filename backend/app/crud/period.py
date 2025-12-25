@@ -409,17 +409,28 @@ class PeriodCRUD:
         self,
         user_id: str,
         period: PeriodInDB,
+        categoria_ahorro_id: str,
         categoria_arriendo_id: str
     ) -> float:
         """
         Calcular liquidez según LOGICA_SISTEMA.md
 
-        Fórmula: liquidez = sueldo - meta_ahorro - total_arriendo_real - credito_periodo_anterior
+        Fórmula: liquidez = sueldo - total_ahorro_real - total_arriendo_real - credito_periodo_anterior
 
         Donde:
+        - total_ahorro_real = gastos_ahorro - aportes_ahorro
         - total_arriendo_real = gastos_arriendo - aportes_arriendo
         - credito_periodo_anterior = total_gastado del período de crédito cerrado más reciente
+
+        NOTA: Ahorro NO tiene meta, se calcula como suma de gastos - aportes
         """
+        # Obtener total real de ahorro
+        total_ahorro_real = await self.calculate_total_real_categoria(
+            user_id,
+            str(period.id),
+            categoria_ahorro_id
+        )
+
         # Obtener total real de arriendo
         total_arriendo_real = await self.calculate_total_real_categoria(
             user_id,
@@ -434,7 +445,7 @@ class PeriodCRUD:
         # Aplicar fórmula
         liquidez = (
             period.sueldo -
-            period.metas_categorias.ahorro -
+            total_ahorro_real -
             total_arriendo_real -
             credito_anterior
         )

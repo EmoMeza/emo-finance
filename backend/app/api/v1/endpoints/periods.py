@@ -84,20 +84,7 @@ async def create_period(
     period_crud = PeriodCRUD(db)
     created = await period_crud.create(str(current_user.id), period)
 
-    return PeriodResponse(
-        _id=str(created.id),
-        user_id=str(created.user_id),
-        tipo_periodo=created.tipo_periodo,
-        fecha_inicio=created.fecha_inicio,
-        fecha_fin=created.fecha_fin,
-        sueldo=created.sueldo,
-        metas_categorias=created.metas_categorias,
-        estado=created.estado,
-        categorias=[str(cat_id) for cat_id in (created.categorias if hasattr(created, 'categorias') and created.categorias else [])],
-        total_gastado=created.total_gastado,
-        created_at=created.created_at,
-        updated_at=created.updated_at
-    )
+    return period_to_response(created)
 
 
 @router.get("/active", response_model=PeriodResponse)
@@ -119,19 +106,7 @@ async def get_active_period(
     period_crud = PeriodCRUD(db, expense_crud=expense_crud, aporte_crud=aporte_crud)
     period = await period_crud.get_active(str(current_user.id), tipo_periodo)
 
-    return PeriodResponse(
-        _id=str(period.id),
-        user_id=str(period.user_id),
-        tipo_periodo=period.tipo_periodo,
-        fecha_inicio=period.fecha_inicio,
-        fecha_fin=period.fecha_fin,
-        sueldo=period.sueldo,
-        metas_categorias=period.metas_categorias,
-        estado=period.estado,
-        total_gastado=period.total_gastado,
-        created_at=period.created_at,
-        updated_at=period.updated_at
-    )
+    return period_to_response(period)
 
 
 @router.get("/", response_model=List[PeriodResponse])
@@ -155,22 +130,7 @@ async def get_periods(
         estado=estado
     )
 
-    return [
-        PeriodResponse(
-            _id=str(per.id),
-            user_id=str(per.user_id),
-            tipo_periodo=per.tipo_periodo,
-            fecha_inicio=per.fecha_inicio,
-            fecha_fin=per.fecha_fin,
-            sueldo=per.sueldo,
-            metas_categorias=per.metas_categorias,
-            estado=per.estado,
-            total_gastado=per.total_gastado,
-            created_at=per.created_at,
-            updated_at=per.updated_at
-        )
-        for per in periods
-    ]
+    return [period_to_response(per) for per in periods]
 
 
 @router.get("/{period_id}", response_model=PeriodResponse)
@@ -191,19 +151,7 @@ async def get_period(
             detail="Period not found"
         )
 
-    return PeriodResponse(
-        _id=str(period.id),
-        user_id=str(period.user_id),
-        tipo_periodo=period.tipo_periodo,
-        fecha_inicio=period.fecha_inicio,
-        fecha_fin=period.fecha_fin,
-        sueldo=period.sueldo,
-        metas_categorias=period.metas_categorias,
-        estado=period.estado,
-        total_gastado=period.total_gastado,
-        created_at=period.created_at,
-        updated_at=period.updated_at
-    )
+    return period_to_response(period)
 
 
 @router.get("/{period_id}/summary", response_model=PeriodSummaryResponse)
@@ -239,24 +187,41 @@ async def get_period_summary(
 
     # Calcular resumen por categoría
     categories_summary = []
+    categoria_ahorro_id = None
     categoria_arriendo_id = None
+
+    # Obtener el período de crédito activo para calcular gastos de crédito
+    periodo_credito = await period_crud.get_active(
+        str(current_user.id),
+        TipoPeriodo.CICLO_CREDITO
+    )
 
     for cat in categories:
         cat_id = str(cat.id)
 
+        # Para Crédito, usar el período de crédito; para el resto, usar el período mensual
+        periodo_para_gastos = period_id
+        if cat.slug == TipoCategoria.CREDITO and periodo_credito:
+            periodo_para_gastos = str(periodo_credito.id)
+
         # Calcular totales
         total_gastos = await expense_crud.calculate_total_by_categoria(
-            str(current_user.id), period_id, cat_id
+            str(current_user.id), periodo_para_gastos, cat_id
         )
 
         total_aportes = await aporte_crud.calculate_total_by_categoria(
-            str(current_user.id), period_id, cat_id
+            str(current_user.id), periodo_para_gastos, cat_id
         )
 
         total_real = total_gastos - total_aportes
 
-        # Guardar ID de categoría arriendo para calcular liquidez
-        if cat.slug == TipoCategoria.ARRIENDO:
+        # DEBUG: Log de totales por categoría
+        print(f"DEBUG: Categoría {cat.nombre} ({cat.slug}): periodo_usado={periodo_para_gastos}, gastos=${total_gastos}, aportes=${total_aportes}, total_real=${total_real}")
+
+        # Guardar IDs de categorías ahorro y arriendo para calcular liquidez
+        if cat.slug == TipoCategoria.AHORRO:
+            categoria_ahorro_id = cat_id
+        elif cat.slug == TipoCategoria.ARRIENDO:
             categoria_arriendo_id = cat_id
 
         # Obtener meta si aplica
@@ -283,27 +248,16 @@ async def get_period_summary(
 
     # Calcular liquidez
     liquidez_calculada = 0.0
-    if period.tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR and categoria_arriendo_id:
+    if period.tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR and categoria_ahorro_id and categoria_arriendo_id:
         liquidez_calculada = await period_crud.calculate_liquidez(
             str(current_user.id),
             period,
+            categoria_ahorro_id,
             categoria_arriendo_id
         )
 
     return PeriodSummaryResponse(
-        period=PeriodResponse(
-            _id=str(period.id),
-            user_id=str(period.user_id),
-            tipo_periodo=period.tipo_periodo,
-            fecha_inicio=period.fecha_inicio,
-            fecha_fin=period.fecha_fin,
-            sueldo=period.sueldo,
-            metas_categorias=period.metas_categorias,
-            estado=period.estado,
-            total_gastado=period.total_gastado,
-            created_at=period.created_at,
-            updated_at=period.updated_at
-        ),
+        period=period_to_response(period),
         categories_summary=categories_summary,
         liquidez_calculada=liquidez_calculada
     )
@@ -329,19 +283,7 @@ async def update_period(
             detail="Period not found"
         )
 
-    return PeriodResponse(
-        _id=str(updated.id),
-        user_id=str(updated.user_id),
-        tipo_periodo=updated.tipo_periodo,
-        fecha_inicio=updated.fecha_inicio,
-        fecha_fin=updated.fecha_fin,
-        sueldo=updated.sueldo,
-        metas_categorias=updated.metas_categorias,
-        estado=updated.estado,
-        total_gastado=updated.total_gastado,
-        created_at=updated.created_at,
-        updated_at=updated.updated_at
-    )
+    return period_to_response(updated)
 
 
 @router.post("/{period_id}/close", response_model=PeriodResponse)
@@ -365,19 +307,7 @@ async def close_period(
             detail="Period not found"
         )
 
-    return PeriodResponse(
-        _id=str(closed.id),
-        user_id=str(closed.user_id),
-        tipo_periodo=closed.tipo_periodo,
-        fecha_inicio=closed.fecha_inicio,
-        fecha_fin=closed.fecha_fin,
-        sueldo=closed.sueldo,
-        metas_categorias=closed.metas_categorias,
-        estado=closed.estado,
-        total_gastado=closed.total_gastado,
-        created_at=closed.created_at,
-        updated_at=closed.updated_at
-    )
+    return period_to_response(closed)
 
 
 @router.delete("/{period_id}", status_code=status.HTTP_204_NO_CONTENT)

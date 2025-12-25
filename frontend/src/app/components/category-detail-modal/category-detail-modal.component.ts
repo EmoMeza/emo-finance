@@ -48,18 +48,23 @@ export class CategoryDetailModalComponent implements OnInit {
   // Datos computados
   gastosFijos = computed(() =>
     this.expenseService.expenses().filter(e =>
-      e.categoria_id === this.category._id && e.tipo === TipoGasto.FIJO
+      e.periodo_id === this.periodoId &&
+      e.categoria_id === this.category._id &&
+      e.tipo === TipoGasto.FIJO
     )
   );
 
   gastosVariables = computed(() =>
     this.expenseService.expenses().filter(e =>
-      e.categoria_id === this.category._id && e.tipo === TipoGasto.VARIABLE
+      e.periodo_id === this.periodoId &&
+      e.categoria_id === this.category._id &&
+      e.tipo === TipoGasto.VARIABLE
     )
   );
 
   aportes = computed(() =>
     this.aporteService.aportes().filter(a =>
+      a.periodo_id === this.periodoId &&
       a.categoria_id === this.category._id
     )
   );
@@ -94,12 +99,32 @@ export class CategoryDetailModalComponent implements OnInit {
 
   ngOnInit() {
     // Cargar gastos y aportes de esta categoría
+    console.log('DEBUG MODAL: ngOnInit', {
+      categoria: this.category.nombre,
+      periodoId: this.periodoId,
+      categoriaId: this.category._id
+    });
     this.loadCategoryData();
   }
 
   loadCategoryData() {
-    this.expenseService.getExpenses(this.periodoId, undefined, this.category._id).subscribe();
-    this.aporteService.getAportes(this.periodoId, undefined, this.category._id).subscribe();
+    console.log('DEBUG MODAL: loadCategoryData', {
+      periodoId: this.periodoId,
+      categoriaId: this.category._id
+    });
+
+    this.expenseService.getExpenses(this.periodoId, undefined, this.category._id).subscribe(expenses => {
+      console.log('DEBUG MODAL: Expenses cargados:', expenses);
+      console.log('DEBUG MODAL: Total expenses en servicio:', this.expenseService.expenses());
+      console.log('DEBUG MODAL: Gastos fijos filtrados:', this.gastosFijos());
+      console.log('DEBUG MODAL: Gastos variables filtrados:', this.gastosVariables());
+    });
+
+    this.aporteService.getAportes(this.periodoId, undefined, this.category._id).subscribe(aportes => {
+      console.log('DEBUG MODAL: Aportes cargados:', aportes);
+      console.log('DEBUG MODAL: Total aportes en servicio:', this.aporteService.aportes());
+      console.log('DEBUG MODAL: Aportes filtrados:', this.aportes());
+    });
   }
 
   setActiveTab(tab: TabType) {
@@ -121,14 +146,12 @@ export class CategoryDetailModalComponent implements OnInit {
   }
 
   resetExpenseForm() {
-    this.expenseForm = {
-      nombre: '',
-      monto: 0,
-      tipo: this.expenseType() === 'fijo' ? TipoGasto.FIJO : TipoGasto.VARIABLE,
-      es_permanente: true,
-      periodos_restantes: 0,
-      descripcion: ''
-    };
+    this.expenseForm.nombre = '';
+    this.expenseForm.monto = 0;
+    this.expenseForm.tipo = this.expenseType() === 'fijo' ? TipoGasto.FIJO : TipoGasto.VARIABLE;
+    this.expenseForm.es_permanente = true;
+    this.expenseForm.periodos_restantes = 0;
+    this.expenseForm.descripcion = '';
   }
 
   cancelExpenseForm() {
@@ -193,12 +216,10 @@ export class CategoryDetailModalComponent implements OnInit {
   }
 
   resetAporteForm() {
-    this.aporteForm = {
-      nombre: '',
-      monto: 0,
-      es_fijo: true,
-      descripcion: ''
-    };
+    this.aporteForm.nombre = '';
+    this.aporteForm.monto = 0;
+    this.aporteForm.es_fijo = true;
+    this.aporteForm.descripcion = '';
   }
 
   cancelAporteForm() {
