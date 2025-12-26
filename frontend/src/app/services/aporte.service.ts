@@ -48,7 +48,7 @@ export class AporteService {
    * Obtener un aporte por ID
    */
   getAporteById(id: string): Observable<Aporte> {
-    return this.http.get<Aporte>(`${this.API_URL}/${id}`);
+    return this.http.get<Aporte>(`${this.API_URL}${id}`);
   }
 
   /**
@@ -68,7 +68,7 @@ export class AporteService {
    * Actualizar un aporte
    */
   updateAporte(id: string, updates: AporteUpdate): Observable<Aporte> {
-    return this.http.put<Aporte>(`${this.API_URL}/${id}`, updates).pipe(
+    return this.http.put<Aporte>(`${this.API_URL}${id}`, updates).pipe(
       tap(updatedAporte => {
         this.aportes.update(aps =>
           aps.map(ap => ap._id === id ? updatedAporte : ap)
@@ -81,7 +81,7 @@ export class AporteService {
    * Eliminar un aporte
    */
   deleteAporte(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/${id}`).pipe(
+    return this.http.delete<void>(`${this.API_URL}${id}`).pipe(
       tap(() => {
         this.aportes.update(aps => aps.filter(ap => ap._id !== id));
       })

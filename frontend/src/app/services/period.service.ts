@@ -35,7 +35,7 @@ export class PeriodService {
 
     const params = new HttpParams().set('tipo_periodo', tipoPeriodo);
 
-    return this.http.get<Period>(`${this.API_URL}/active`, { params }).pipe(
+    return this.http.get<Period>(`${this.API_URL}active`, { params }).pipe(
       tap(period => {
         if (tipoPeriodo === TipoPeriodo.MENSUAL_ESTANDAR) {
           this.activeMensualPeriod.set(period);
@@ -78,7 +78,7 @@ export class PeriodService {
    * Obtener un período por ID
    */
   getPeriodById(id: string): Observable<Period> {
-    return this.http.get<Period>(`${this.API_URL}/${id}`);
+    return this.http.get<Period>(`${this.API_URL}${id}`);
   }
 
   /**
@@ -87,7 +87,7 @@ export class PeriodService {
   getPeriodSummary(id: string): Observable<PeriodSummary> {
     this.isLoading.set(true);
 
-    return this.http.get<PeriodSummary>(`${this.API_URL}/${id}/summary`).pipe(
+    return this.http.get<PeriodSummary>(`${this.API_URL}${id}/summary`).pipe(
       tap(summary => {
         console.log('DEBUG: PeriodSummary recibido del backend:', summary);
         console.log('DEBUG: categories_summary:', summary.categories_summary);
@@ -112,7 +112,7 @@ export class PeriodService {
    * Actualizar un período
    */
   updatePeriod(id: string, updates: PeriodUpdate): Observable<Period> {
-    return this.http.put<Period>(`${this.API_URL}/${id}`, updates).pipe(
+    return this.http.put<Period>(`${this.API_URL}${id}`, updates).pipe(
       tap(updatedPeriod => {
         this.periods.update(pers =>
           pers.map(per => per._id === id ? updatedPeriod : per)
@@ -134,7 +134,7 @@ export class PeriodService {
    * Cerrar un período
    */
   closePeriod(id: string): Observable<Period> {
-    return this.http.post<Period>(`${this.API_URL}/${id}/close`, {}).pipe(
+    return this.http.post<Period>(`${this.API_URL}${id}/close`, {}).pipe(
       tap(closedPeriod => {
         this.periods.update(pers =>
           pers.map(per => per._id === id ? closedPeriod : per)
@@ -154,7 +154,7 @@ export class PeriodService {
    * Eliminar un período
    */
   deletePeriod(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/${id}`).pipe(
+    return this.http.delete<void>(`${this.API_URL}${id}`).pipe(
       tap(() => {
         this.periods.update(pers => pers.filter(per => per._id !== id));
       })

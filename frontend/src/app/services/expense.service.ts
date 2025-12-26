@@ -48,7 +48,7 @@ export class ExpenseService {
    * Obtener un gasto por ID
    */
   getExpenseById(id: string): Observable<Expense> {
-    return this.http.get<Expense>(`${this.API_URL}/${id}`);
+    return this.http.get<Expense>(`${this.API_URL}${id}`);
   }
 
   /**
@@ -68,7 +68,7 @@ export class ExpenseService {
    * Actualizar un gasto
    */
   updateExpense(id: string, updates: ExpenseUpdate): Observable<Expense> {
-    return this.http.put<Expense>(`${this.API_URL}/${id}`, updates).pipe(
+    return this.http.put<Expense>(`${this.API_URL}${id}`, updates).pipe(
       tap(updatedExpense => {
         this.expenses.update(exps =>
           exps.map(exp => exp._id === id ? updatedExpense : exp)
@@ -81,7 +81,7 @@ export class ExpenseService {
    * Eliminar un gasto
    */
   deleteExpense(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/${id}`).pipe(
+    return this.http.delete<void>(`${this.API_URL}${id}`).pipe(
       tap(() => {
         this.expenses.update(exps => exps.filter(exp => exp._id !== id));
       })

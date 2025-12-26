@@ -34,14 +34,14 @@ export class CategoryService {
    * Obtener una categoría por ID
    */
   getCategoryById(id: string): Observable<Category> {
-    return this.http.get<Category>(`${this.API_URL}/${id}`);
+    return this.http.get<Category>(`${this.API_URL}${id}`);
   }
 
   /**
    * Obtener una categoría por slug (ahorro, arriendo, credito, liquidez)
    */
   getCategoryBySlug(slug: TipoCategoria): Observable<Category> {
-    return this.http.get<Category>(`${this.API_URL}/by-slug/${slug}`);
+    return this.http.get<Category>(`${this.API_URL}by-slug/${slug}`);
   }
 
   /**
@@ -60,7 +60,7 @@ export class CategoryService {
    */
   initDefaultCategories(): Observable<Category[]> {
     this.isLoading.set(true);
-    return this.http.post<Category[]>(`${this.API_URL}/init-defaults`, {}).pipe(
+    return this.http.post<Category[]>(`${this.API_URL}init-defaults`, {}).pipe(
       tap(categories => {
         this.categories.set(categories);
         this.isLoading.set(false);
@@ -72,7 +72,7 @@ export class CategoryService {
    * Actualizar una categoría
    */
   updateCategory(id: string, updates: CategoryUpdate): Observable<Category> {
-    return this.http.put<Category>(`${this.API_URL}/${id}`, updates).pipe(
+    return this.http.put<Category>(`${this.API_URL}${id}`, updates).pipe(
       tap(updatedCategory => {
         this.categories.update(cats =>
           cats.map(cat => cat._id === id ? updatedCategory : cat)
@@ -85,7 +85,7 @@ export class CategoryService {
    * Eliminar una categoría
    */
   deleteCategory(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.API_URL}/${id}`).pipe(
+    return this.http.delete<void>(`${this.API_URL}${id}`).pipe(
       tap(() => {
         this.categories.update(cats => cats.filter(cat => cat._id !== id));
       })
