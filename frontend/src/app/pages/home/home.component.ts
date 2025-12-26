@@ -22,6 +22,8 @@ export class HomeComponent implements OnInit {
   error = signal('');
   showInitialSetupModal = signal(false);
   showCategoryModal = signal(false);
+  showEditSueldoModal = signal(false);
+  editSueldoValue = signal(0);
   selectedCategory = signal<Category | null>(null);
   selectedCategoryMeta = signal<number | undefined>(undefined);
   selectedPeriodId = signal<string>('');
@@ -376,6 +378,49 @@ export class HomeComponent implements OnInit {
         new Date(period.fecha_inicio),
         new Date(period.fecha_fin)
       );
+    }
+  }
+
+  // ==================
+  // EDIT SUELDO MODAL
+  // ==================
+
+  openEditSueldoModal() {
+    const currentSueldo = this.sueldo();
+    this.editSueldoValue.set(currentSueldo);
+    this.showEditSueldoModal.set(true);
+  }
+
+  closeEditSueldoModal() {
+    this.showEditSueldoModal.set(false);
+    this.editSueldoValue.set(0);
+  }
+
+  async saveEditSueldo() {
+    const newSueldo = this.editSueldoValue();
+
+    if (newSueldo <= 0) {
+      alert('El sueldo debe ser mayor a 0');
+      return;
+    }
+
+    const period = this.periodService.activeMensualPeriod();
+    if (!period) {
+      alert('No hay período activo');
+      return;
+    }
+
+    try {
+      // TODO: Llamar al endpoint para actualizar el sueldo del período
+      await this.periodService.updatePeriod(period._id, { sueldo: newSueldo }).toPromise();
+
+      this.closeEditSueldoModal();
+
+      // Recargar el dashboard
+      await this.loadDashboardData();
+    } catch (error) {
+      console.error('Error updating sueldo:', error);
+      alert('Error al actualizar el sueldo');
     }
   }
 }

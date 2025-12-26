@@ -483,6 +483,16 @@
   animation: modalSlideIn 0.3s ease-out;
 }
 
+/* Modal Content Small (para modales pequeños como editar sueldo) */
+.modal-content-small {
+  background: white;
+  border-radius: 1rem;
+  max-width: 450px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
 @keyframes modalSlideIn {
   from {
     opacity: 0;
@@ -510,7 +520,8 @@
   margin: 0;
 }
 
-.btn-close {
+.btn-close,
+.close-btn {
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -523,9 +534,12 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
 }
 
-.btn-close:hover {
+.btn-close:hover,
+.close-btn:hover {
   background: #e2e8f0;
   color: #1a202c;
 }

@@ -27,9 +27,9 @@
           <button class="btn-config" (click)="openInitialSetupModal()">Configurar</button>
         </div>
       } @else {
-        <button class="btn-edit" (click)="openInitialSetupModal()">
+        <button class="btn-edit" (click)="openEditSueldoModal()">
           <span>✏️</span>
-          Editar Período
+          Editar Sueldo
         </button>
       }
     </div>
@@ -153,5 +153,41 @@
       (close)="closeCategoryModal()"
       (metaChanged)="onMetaChanged($event)"
     ></app-category-detail-modal>
+  }
+
+  <!-- Modal de Editar Sueldo -->
+  @if (showEditSueldoModal()) {
+    <div class="modal-overlay" (click)="closeEditSueldoModal()">
+      <div class="modal-content-small" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>✏️ Editar Sueldo</h2>
+          <button class="close-btn" (click)="closeEditSueldoModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="sueldo-input">Sueldo mensual</label>
+            <input
+              id="sueldo-input"
+              type="number"
+              [(ngModel)]="editSueldoValue"
+              class="form-input"
+              placeholder="Ej: 1000000"
+              min="0"
+              step="1000">
+            <small>Este es tu ingreso mensual principal</small>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeEditSueldoModal()">
+            Cancelar
+          </button>
+          <button class="btn-primary" (click)="saveEditSueldo()">
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
   }
 </div>
