@@ -95,6 +95,10 @@ async def login(login_data: LoginRequest, db=Depends(get_database)):
             detail="User account is inactive"
         )
 
+    # Failsafe: Ensure user has default categories (for existing users)
+    category_crud = CategoryCRUD(db)
+    await category_crud.check_and_init_if_needed(str(user.id))
+
     # Create access token with user information including role
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(

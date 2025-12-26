@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
 from app.core.security import verify_password, get_password_hash
 from app.crud.user import UserCRUD
+from app.crud.category import CategoryCRUD
 from app.models.user import (
     UserInDB,
     UserResponse,
@@ -17,13 +18,18 @@ router = APIRouter()
 
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
-    current_user: UserInDB = Depends(get_current_active_user)
+    current_user: UserInDB = Depends(get_current_active_user),
+    db=Depends(get_database)
 ):
     """
     Get current user information.
 
     Returns the authenticated user's profile.
     """
+    # Failsafe: Ensure user has default categories
+    category_crud = CategoryCRUD(db)
+    await category_crud.check_and_init_if_needed(str(current_user.id))
+
     return UserResponse(
         _id=str(current_user.id),
         email=current_user.email,

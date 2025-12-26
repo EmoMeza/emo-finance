@@ -123,6 +123,9 @@ class CategoryCRUD:
 
         for cat_data in DEFAULT_CATEGORIES:
             category_dict = cat_data.copy()
+            # Convertir el enum TipoCategoria a string para MongoDB
+            if isinstance(category_dict["slug"], TipoCategoria):
+                category_dict["slug"] = category_dict["slug"].value
             category_dict["user_id"] = ObjectId(user_id)
             category_dict["created_at"] = datetime.utcnow()
             category_dict["updated_at"] = datetime.utcnow()

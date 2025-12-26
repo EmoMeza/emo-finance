@@ -8,7 +8,7 @@ import { Category, CategoryCreate, CategoryUpdate, TipoCategoria } from '../mode
   providedIn: 'root'
 })
 export class CategoryService {
-  private readonly API_URL = `${environment.apiUrl}/categories`;
+  private readonly API_URL = `${environment.apiUrl}/categories/`;
 
   // Signal for reactive categories state
   categories = signal<Category[]>([]);
