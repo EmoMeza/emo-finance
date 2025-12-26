@@ -1,8 +1,14 @@
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from pydantic_core import core_schema
-from typing import Optional, Any
+from typing import Optional, Any, Literal
 from datetime import datetime
 from bson import ObjectId
+from enum import Enum
+
+
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    USER = "user"
 
 
 class PyObjectId(str):
@@ -32,6 +38,7 @@ class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: str = Field(..., min_length=1, max_length=100)
+    role: UserRole = Field(default=UserRole.USER)
 
 
 class UserCreate(UserBase):
@@ -44,6 +51,7 @@ class UserUpdate(BaseModel):
     first_name: Optional[str] = Field(None, min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, min_length=1, max_length=100)
     password: Optional[str] = Field(None, min_length=8, max_length=100)
+    role: Optional[UserRole] = None
 
 
 class UserInDB(UserBase):
@@ -87,6 +95,38 @@ class UserResponse(UserBase):
                 "is_active": True,
                 "created_at": "2025-01-01T00:00:00",
                 "updated_at": "2025-01-01T00:00:00"
+            }
+        }
+    }
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=100)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "current_password": "currentpass123",
+                "new_password": "newpass123"
+            }
+        }
+    }
+
+
+class UpdateProfileRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    username: Optional[str] = Field(None, min_length=3, max_length=50)
+    first_name: Optional[str] = Field(None, min_length=1, max_length=100)
+    last_name: Optional[str] = Field(None, min_length=1, max_length=100)
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "email": "newemail@example.com",
+                "username": "newusername",
+                "first_name": "John",
+                "last_name": "Doe"
             }
         }
     }

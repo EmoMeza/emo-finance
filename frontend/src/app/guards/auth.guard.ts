@@ -29,3 +29,24 @@ export const guestGuard: CanActivateFn = (route, state) => {
   router.navigate(['/home']);
   return false;
 };
+
+export const adminGuard: CanActivateFn = (route, state) => {
+  const authService = inject(AuthService);
+  const router = inject(Router);
+
+  if (!authService.isAuthenticated()) {
+    // Redirect to login if not authenticated
+    router.navigate(['/login'], {
+      queryParams: { returnUrl: state.url }
+    });
+    return false;
+  }
+
+  if (authService.isAdmin()) {
+    return true;
+  }
+
+  // Redirect to home if not admin
+  router.navigate(['/home']);
+  return false;
+};

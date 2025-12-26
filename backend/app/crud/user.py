@@ -63,6 +63,12 @@ class UserCRUD:
         users = await cursor.to_list(length=limit)
         return [UserInDB(**user) for user in users]
 
+    async def get_all_users(self, skip: int = 0, limit: int = 100) -> List[UserInDB]:
+        """
+        Alias for get_all. Get all users with pagination.
+        """
+        return await self.get_all(skip=skip, limit=limit)
+
     async def update(self, user_id: str, user_update: UserUpdate) -> Optional[UserInDB]:
         """
         Update a user by ID.

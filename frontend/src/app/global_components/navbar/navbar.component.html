@@ -45,6 +45,18 @@
             <span class="nav-icon">👤</span>
             <span>Perfil</span>
           </a>
+
+          @if (authService.isAdmin()) {
+            <a
+              routerLink="/admin"
+              routerLinkActive="active"
+              (click)="closeMenu()"
+              class="nav-link"
+            >
+              <span class="nav-icon">⚙️</span>
+              <span>Dashboard Admin</span>
+            </a>
+          }
         </div>
 
         <div class="nav-actions">

@@ -1,8 +1,15 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
+from app.core.security import verify_password, get_password_hash
 from app.crud.user import UserCRUD
-from app.models.user import UserInDB, UserResponse, UserUpdate
+from app.models.user import (
+    UserInDB,
+    UserResponse,
+    UserUpdate,
+    ChangePasswordRequest,
+    UpdateProfileRequest
+)
 from app.api.dependencies import get_current_active_user
 
 router = APIRouter()
@@ -176,3 +183,94 @@ async def delete_user(
         )
 
     return None
+
+
+@router.put("/me/profile", response_model=UserResponse)
+async def update_my_profile(
+    profile_update: UpdateProfileRequest,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db=Depends(get_database)
+):
+    """
+    Update current user's profile information.
+
+    Allows updating email, username, first_name, and last_name.
+    """
+    user_crud = UserCRUD(db)
+
+    # Check for email uniqueness if being updated
+    if profile_update.email and profile_update.email != current_user.email:
+        if await user_crud.exists_by_email(profile_update.email):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+
+    # Check for username uniqueness if being updated
+    if profile_update.username and profile_update.username != current_user.username:
+        if await user_crud.exists_by_username(profile_update.username):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Username already taken"
+            )
+
+    # Convert to UserUpdate model
+    user_update = UserUpdate(
+        email=profile_update.email,
+        username=profile_update.username,
+        first_name=profile_update.first_name,
+        last_name=profile_update.last_name
+    )
+
+    updated_user = await user_crud.update(str(current_user.id), user_update)
+
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    return UserResponse(
+        _id=str(updated_user.id),
+        email=updated_user.email,
+        username=updated_user.username,
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
+        role=updated_user.role,
+        is_active=updated_user.is_active,
+        created_at=updated_user.created_at,
+        updated_at=updated_user.updated_at
+    )
+
+
+@router.post("/me/change-password")
+async def change_my_password(
+    password_change: ChangePasswordRequest,
+    current_user: UserInDB = Depends(get_current_active_user),
+    db=Depends(get_database)
+):
+    """
+    Change current user's password.
+
+    Requires current password for verification.
+    """
+    # Verify current password
+    if not verify_password(password_change.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Incorrect current password"
+        )
+
+    # Update password
+    user_crud = UserCRUD(db)
+    user_update = UserUpdate(password=password_change.new_password)
+
+    updated_user = await user_crud.update(str(current_user.id), user_update)
+
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    return {"message": "Password updated successfully"}

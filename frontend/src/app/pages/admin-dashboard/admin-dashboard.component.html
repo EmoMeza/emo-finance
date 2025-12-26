@@ -1,0 +1,213 @@
+<div class="admin-dashboard">
+  <div class="header">
+    <h1>Dashboard Admin</h1>
+  </div>
+
+  <!-- Statistics Cards -->
+  @if (stats()) {
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Usuarios</div>
+        <div class="stat-value">{{ stats()!.total_users }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Usuarios Activos</div>
+        <div class="stat-value">{{ stats()!.active_users }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Administradores</div>
+        <div class="stat-value">{{ stats()!.admin_users }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Usuarios Regulares</div>
+        <div class="stat-value">{{ stats()!.regular_users }}</div>
+      </div>
+    </div>
+  }
+
+  <!-- Error Message -->
+  @if (error()) {
+    <div class="error-message">
+      {{ error() }}
+    </div>
+  }
+
+  <!-- Action Bar -->
+  <div class="action-bar">
+    <button class="btn btn-primary" (click)="openCreateModal()">
+      Crear Usuario
+    </button>
+  </div>
+
+  <!-- Users Table -->
+  <div class="users-table-container">
+    @if (loading()) {
+      <div class="loading">Cargando...</div>
+    } @else if (users().length === 0) {
+      <div class="no-data">No hay usuarios para mostrar</div>
+    } @else {
+      <table class="users-table">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Email</th>
+            <th>Nombre</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user._id) {
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.email }}</td>
+              <td>{{ user.first_name }} {{ user.last_name }}</td>
+              <td>
+                <span class="badge" [class.badge-admin]="user.role === 'admin'" [class.badge-user]="user.role === 'user'">
+                  {{ user.role === 'admin' ? 'Admin' : 'Usuario' }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" [class.badge-active]="user.is_active" [class.badge-inactive]="!user.is_active">
+                  {{ user.is_active ? 'Activo' : 'Inactivo' }}
+                </span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button class="btn btn-sm btn-secondary" (click)="openEditModal(user)">
+                    Editar
+                  </button>
+                  <button class="btn btn-sm btn-danger" (click)="onDeleteUser(user)">
+                    Eliminar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <!-- Create User Modal -->
+  @if (showCreateModal()) {
+    <div class="modal-overlay" (click)="closeCreateModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Crear Nuevo Usuario</h2>
+          <button class="close-btn" (click)="closeCreateModal()">&times;</button>
+        </div>
+        <form [formGroup]="createUserForm" (ngSubmit)="onCreateUser()">
+          <div class="form-group">
+            <label for="create-email">Email *</label>
+            <input id="create-email" type="email" formControlName="email" class="form-control">
+            @if (createUserForm.get('email')?.invalid && createUserForm.get('email')?.touched) {
+              <div class="error-text">Email inválido</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="create-username">Usuario *</label>
+            <input id="create-username" type="text" formControlName="username" class="form-control">
+            @if (createUserForm.get('username')?.invalid && createUserForm.get('username')?.touched) {
+              <div class="error-text">El usuario debe tener entre 3 y 50 caracteres</div>
+            }
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="create-first-name">Nombre *</label>
+              <input id="create-first-name" type="text" formControlName="first_name" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="create-last-name">Apellido *</label>
+              <input id="create-last-name" type="text" formControlName="last_name" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="create-password">Contraseña *</label>
+            <input id="create-password" type="password" formControlName="password" class="form-control">
+            @if (createUserForm.get('password')?.invalid && createUserForm.get('password')?.touched) {
+              <div class="error-text">La contraseña debe tener al menos 8 caracteres</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="create-role">Rol *</label>
+            <select id="create-role" formControlName="role" class="form-control">
+              <option value="user">Usuario</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeCreateModal()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="createUserForm.invalid || loading()">
+              Crear Usuario
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- Edit User Modal -->
+  @if (showEditModal() && selectedUser()) {
+    <div class="modal-overlay" (click)="closeEditModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Editar Usuario</h2>
+          <button class="close-btn" (click)="closeEditModal()">&times;</button>
+        </div>
+        <form [formGroup]="editUserForm" (ngSubmit)="onEditUser()">
+          <div class="form-group">
+            <label for="edit-email">Email</label>
+            <input id="edit-email" type="email" formControlName="email" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="edit-username">Usuario</label>
+            <input id="edit-username" type="text" formControlName="username" class="form-control">
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="edit-first-name">Nombre</label>
+              <input id="edit-first-name" type="text" formControlName="first_name" class="form-control">
+            </div>
+            <div class="form-group">
+              <label for="edit-last-name">Apellido</label>
+              <input id="edit-last-name" type="text" formControlName="last_name" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-password">Nueva Contraseña (dejar en blanco para no cambiar)</label>
+            <input id="edit-password" type="password" formControlName="password" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="edit-role">Rol</label>
+            <select id="edit-role" formControlName="role" class="form-control">
+              <option value="user">Usuario</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="editUserForm.invalid || loading()">
+              Actualizar Usuario
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+</div>

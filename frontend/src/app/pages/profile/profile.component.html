@@ -8,6 +8,14 @@
 
   @if (authService.currentUser()) {
     <div class="profile-content">
+      <!-- Error/Success Messages -->
+      @if (error()) {
+        <div class="error-message">{{ error() }}</div>
+      }
+      @if (successMessage()) {
+        <div class="success-message">{{ successMessage() }}</div>
+      }
+
       <div class="profile-section">
         <h2>Información Personal</h2>
         <div class="info-grid">
@@ -17,8 +25,13 @@
           </div>
 
           <div class="info-item">
-            <label>ID de Usuario</label>
-            <p class="text-muted">{{ authService.currentUser()?._id }}</p>
+            <label>Usuario</label>
+            <p>{{ authService.currentUser()?.username }}</p>
+          </div>
+
+          <div class="info-item">
+            <label>Nombre</label>
+            <p>{{ authService.currentUser()?.first_name }} {{ authService.currentUser()?.last_name }}</p>
           </div>
 
           <div class="info-item">
@@ -35,7 +48,7 @@
       <div class="profile-section">
         <h2>Acciones de Cuenta</h2>
         <div class="actions-list">
-          <button class="action-item">
+          <button class="action-item" (click)="openEditModal()">
             <span class="action-icon">✏️</span>
             <div class="action-content">
               <h3>Editar Perfil</h3>
@@ -44,29 +57,11 @@
             <span class="action-arrow">›</span>
           </button>
 
-          <button class="action-item">
+          <button class="action-item" (click)="openPasswordModal()">
             <span class="action-icon">🔒</span>
             <div class="action-content">
               <h3>Cambiar Contraseña</h3>
               <p>Actualiza tu contraseña de acceso</p>
-            </div>
-            <span class="action-arrow">›</span>
-          </button>
-
-          <button class="action-item">
-            <span class="action-icon">🔔</span>
-            <div class="action-content">
-              <h3>Notificaciones</h3>
-              <p>Configura tus preferencias de notificaciones</p>
-            </div>
-            <span class="action-arrow">›</span>
-          </button>
-
-          <button class="action-item">
-            <span class="action-icon">🌙</span>
-            <div class="action-content">
-              <h3>Tema</h3>
-              <p>Cambia entre modo claro y oscuro</p>
             </div>
             <span class="action-arrow">›</span>
           </button>
@@ -75,10 +70,98 @@
 
       <div class="profile-section danger-zone">
         <h2>Zona Peligrosa</h2>
-        <button class="btn-danger">
+        <button class="btn-danger" (click)="onDeleteAccount()" [disabled]="loading()">
           <span class="action-icon">⚠️</span>
           <span>Eliminar Cuenta</span>
         </button>
+      </div>
+    </div>
+  }
+
+  <!-- Edit Profile Modal -->
+  @if (showEditModal()) {
+    <div class="modal-overlay" (click)="closeEditModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Editar Perfil</h2>
+          <button class="close-btn" (click)="closeEditModal()">&times;</button>
+        </div>
+        <form [formGroup]="editProfileForm" (ngSubmit)="onUpdateProfile()">
+          <div class="form-group">
+            <label for="edit-email">Email *</label>
+            <input id="edit-email" type="email" formControlName="email" class="form-control">
+            @if (editProfileForm.get('email')?.invalid && editProfileForm.get('email')?.touched) {
+              <div class="error-text">Email inválido</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="edit-username">Usuario *</label>
+            <input id="edit-username" type="text" formControlName="username" class="form-control">
+            @if (editProfileForm.get('username')?.invalid && editProfileForm.get('username')?.touched) {
+              <div class="error-text">El usuario debe tener entre 3 y 50 caracteres</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="edit-first-name">Nombre *</label>
+            <input id="edit-first-name" type="text" formControlName="first_name" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="edit-last-name">Apellido *</label>
+            <input id="edit-last-name" type="text" formControlName="last_name" class="form-control">
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closeEditModal()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="editProfileForm.invalid || loading()">
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
+  <!-- Change Password Modal -->
+  @if (showPasswordModal()) {
+    <div class="modal-overlay" (click)="closePasswordModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>Cambiar Contraseña</h2>
+          <button class="close-btn" (click)="closePasswordModal()">&times;</button>
+        </div>
+        <form [formGroup]="changePasswordForm" (ngSubmit)="onChangePassword()">
+          <div class="form-group">
+            <label for="current-password">Contraseña Actual *</label>
+            <input id="current-password" type="password" formControlName="current_password" class="form-control">
+          </div>
+
+          <div class="form-group">
+            <label for="new-password">Nueva Contraseña *</label>
+            <input id="new-password" type="password" formControlName="new_password" class="form-control">
+            @if (changePasswordForm.get('new_password')?.invalid && changePasswordForm.get('new_password')?.touched) {
+              <div class="error-text">La contraseña debe tener al menos 8 caracteres</div>
+            }
+          </div>
+
+          <div class="form-group">
+            <label for="confirm-password">Confirmar Nueva Contraseña *</label>
+            <input id="confirm-password" type="password" formControlName="confirm_password" class="form-control">
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" (click)="closePasswordModal()">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary" [disabled]="changePasswordForm.invalid || loading()">
+              Cambiar Contraseña
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   }

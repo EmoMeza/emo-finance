@@ -4,6 +4,11 @@ import { Observable, tap } from 'rxjs';
 import { Router } from '@angular/router';
 import { environment } from '../../environments/environment';
 
+export enum UserRole {
+  ADMIN = 'admin',
+  USER = 'user'
+}
+
 export interface LoginRequest {
   identifier: string;
   password: string;
@@ -28,6 +33,7 @@ export interface User {
   username: string;
   first_name: string;
   last_name: string;
+  role: UserRole;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -91,7 +97,7 @@ export class AuthService {
     return !!this.getToken();
   }
 
-  private loadCurrentUser(): void {
+  loadCurrentUser(): void {
     // In a real app, you might want to fetch user details from an endpoint
     // For now, we decode the token payload (in production, validate this server-side)
     const token = this.getToken();
@@ -103,9 +109,10 @@ export class AuthService {
         this.currentUser.set({
           _id: payload.sub,
           email: payload.email,
-          username: '',
-          first_name: '',
-          last_name: '',
+          username: payload.username || '',
+          first_name: payload.first_name || '',
+          last_name: payload.last_name || '',
+          role: payload.role || UserRole.USER,
           is_active: true,
           created_at: '',
           updated_at: ''
@@ -121,5 +128,21 @@ export class AuthService {
   getAuthHeaders(): { Authorization: string } | {} {
     const token = this.getToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  /**
+   * Verifica si el usuario actual es administrador
+   */
+  isAdmin(): boolean {
+    const user = this.currentUser();
+    return user?.role === UserRole.ADMIN;
+  }
+
+  /**
+   * Verifica si el usuario actual es un usuario regular
+   */
+  isRegularUser(): boolean {
+    const user = this.currentUser();
+    return user?.role === UserRole.USER;
   }
 }

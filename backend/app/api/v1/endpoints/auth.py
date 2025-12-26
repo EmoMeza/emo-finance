@@ -47,6 +47,7 @@ async def register(user_data: UserCreate, db=Depends(get_database)):
         username=user.username,
         first_name=user.first_name,
         last_name=user.last_name,
+        role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
         updated_at=user.updated_at
@@ -89,10 +90,17 @@ async def login(login_data: LoginRequest, db=Depends(get_database)):
             detail="User account is inactive"
         )
 
-    # Create access token
+    # Create access token with user information including role
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": str(user.id), "email": user.email},
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "role": user.role.value
+        },
         expires_delta=access_token_expires
     )
 
