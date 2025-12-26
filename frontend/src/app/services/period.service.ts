@@ -15,7 +15,7 @@ import {
   providedIn: 'root'
 })
 export class PeriodService {
-  private readonly API_URL = `${environment.apiUrl}/periods`;
+  private readonly API_URL = `${environment.apiUrl}/periods/`;
 
   // Signals for reactive periods state
   periods = signal<Period[]>([]);

@@ -8,7 +8,7 @@ import { Aporte, AporteCreate, AporteUpdate } from '../models';
   providedIn: 'root'
 })
 export class AporteService {
-  private readonly API_URL = `${environment.apiUrl}/aportes`;
+  private readonly API_URL = `${environment.apiUrl}/aportes/`;
 
   // Signal for reactive aportes state
   aportes = signal<Aporte[]>([]);

@@ -8,7 +8,7 @@ import { Expense, ExpenseCreate, ExpenseUpdate, TipoGasto } from '../models';
   providedIn: 'root'
 })
 export class ExpenseService {
-  private readonly API_URL = `${environment.apiUrl}/expenses`;
+  private readonly API_URL = `${environment.apiUrl}/expenses/`;
 
   // Signal for reactive expenses state
   expenses = signal<Expense[]>([]);
