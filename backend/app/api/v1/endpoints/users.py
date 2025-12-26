@@ -30,6 +30,7 @@ async def get_current_user_info(
         username=current_user.username,
         first_name=current_user.first_name,
         last_name=current_user.last_name,
+        role=current_user.role,
         is_active=current_user.is_active,
         created_at=current_user.created_at,
         updated_at=current_user.updated_at
