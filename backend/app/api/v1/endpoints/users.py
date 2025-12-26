@@ -152,6 +152,7 @@ async def update_user(
         username=updated_user.username,
         first_name=updated_user.first_name,
         last_name=updated_user.last_name,
+        role=updated_user.role,
         is_active=updated_user.is_active,
         created_at=updated_user.created_at,
         updated_at=updated_user.updated_at
