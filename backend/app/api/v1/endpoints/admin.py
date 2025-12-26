@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
 from app.api.dependencies_admin import get_current_admin_user
 from app.crud.user import UserCRUD
+from app.crud.category import CategoryCRUD
 from app.models.user import (
     UserInDB,
     UserCreate,
@@ -80,6 +81,10 @@ async def create_user_by_admin(
 
     # Crear el usuario
     created_user = await user_crud.create(user)
+
+    # Initialize default categories for the new user
+    category_crud = CategoryCRUD(db)
+    await category_crud.init_default_categories(str(created_user.id))
 
     return UserResponse(
         _id=str(created_user.id),

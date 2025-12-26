@@ -5,6 +5,7 @@ Crea el usuario admin inicial si no existe ningún usuario.
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.core.security import get_password_hash
 from app.models.user import UserRole
+from app.crud.category import CategoryCRUD
 from datetime import datetime
 import logging
 
@@ -42,6 +43,12 @@ async def init_db(db: AsyncIOMotorDatabase) -> None:
 
             result = await db.users.insert_one(admin_user)
             logger.info(f"✅ Usuario admin creado exitosamente con ID: {result.inserted_id}")
+
+            # Crear categorías por defecto para el admin
+            category_crud = CategoryCRUD(db)
+            await category_crud.init_default_categories(str(result.inserted_id))
+            logger.info("✅ Categorías por defecto creadas para el usuario admin")
+
             logger.info("📝 Credenciales iniciales - Username: admin, Password: adminpass")
             logger.warning("⚠️  IMPORTANTE: Cambie la contraseña del admin después del primer login")
         else:

@@ -4,6 +4,7 @@ from app.core.config import settings
 from app.core.database import get_database
 from app.core.security import verify_password, create_access_token
 from app.crud.user import UserCRUD
+from app.crud.category import CategoryCRUD
 from app.models.user import UserCreate, UserResponse
 from app.schemas.auth import Token, LoginRequest
 
@@ -39,6 +40,10 @@ async def register(user_data: UserCreate, db=Depends(get_database)):
 
     # Create user
     user = await user_crud.create(user_data)
+
+    # Initialize default categories for the new user
+    category_crud = CategoryCRUD(db)
+    await category_crud.init_default_categories(str(user.id))
 
     # Convert to response model
     return UserResponse(
