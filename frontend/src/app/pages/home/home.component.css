@@ -713,6 +713,121 @@
   padding: 2rem;
 }
 
+/* Bottom Menu Flotante */
+.bottom-menu {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+}
+
+.fab-button {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.fab-button:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(102, 126, 234, 0.5);
+}
+
+.fab-button:active {
+  transform: translateY(-2px);
+}
+
+.fab-icon {
+  font-size: 2rem;
+  font-weight: 300;
+  color: white;
+  line-height: 1;
+}
+
+/* Toggle Buttons */
+.toggle-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.toggle-btn {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.5rem;
+  background: white;
+  color: #4a5568;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.toggle-btn:hover {
+  border-color: #667eea;
+  background: #f7fafc;
+}
+
+.toggle-btn.active {
+  border-color: #667eea;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* Checkbox Label */
+.checkbox-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.checkbox-label input[type="checkbox"] {
+  margin-top: 0.25rem;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+}
+
+.checkbox-label span {
+  flex: 1;
+}
+
+small {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  color: #718096;
+  font-weight: 400;
+}
+
+/* Select Input */
+select.form-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%234a5568' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+/* Textarea */
+textarea.form-input {
+  resize: vertical;
+  font-family: inherit;
+  min-height: 60px;
+}
+
 /* Responsive Modal */
 @media (max-width: 640px) {
   .modal-content {
@@ -734,5 +849,22 @@
 
   .modal-footer button {
     width: 100%;
+  }
+
+  .toggle-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .fab-button {
+    width: 56px;
+    height: 56px;
+  }
+
+  .fab-icon {
+    font-size: 1.75rem;
+  }
+
+  .bottom-menu {
+    bottom: 1.5rem;
   }
 }

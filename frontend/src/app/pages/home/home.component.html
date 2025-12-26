@@ -109,27 +109,157 @@
         </div>
       </div>
     </div>
+  }
 
-    <!-- Acciones Rápidas -->
-    <div class="quick-actions">
-      <h2>Acciones Rápidas</h2>
-      <div class="actions-grid">
-        <button class="action-btn">
-          <span class="action-icon">➕</span>
-          <span>Registrar Gasto</span>
-        </button>
-        <button class="action-btn">
-          <span class="action-icon">📅</span>
-          <span>Ver Períodos</span>
-        </button>
-        <button class="action-btn">
-          <span class="action-icon">🔄</span>
-          <span>Gastos Fijos</span>
-        </button>
-        <button class="action-btn">
-          <span class="action-icon">📊</span>
-          <span>Reportes</span>
-        </button>
+  <!-- Bottom Menu Flotante -->
+  <div class="bottom-menu">
+    <button class="fab-button" (click)="openQuickAddModal()">
+      <span class="fab-icon">+</span>
+    </button>
+  </div>
+
+  <!-- Modal de Agregar Rápido -->
+  @if (showQuickAddModal()) {
+    <div class="modal-overlay" (click)="closeQuickAddModal()">
+      <div class="modal-content" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <h2>➕ Agregar Gasto/Aporte</h2>
+          <button class="close-btn" (click)="closeQuickAddModal()">&times;</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Tipo de Registro -->
+          <div class="form-group">
+            <label>Tipo de registro *</label>
+            <div class="toggle-buttons">
+              <button
+                class="toggle-btn"
+                [class.active]="quickAddForm.tipoRegistro() === 'gasto'"
+                (click)="quickAddForm.tipoRegistro.set('gasto')">
+                📝 Gasto
+              </button>
+              <button
+                class="toggle-btn"
+                [class.active]="quickAddForm.tipoRegistro() === 'aporte'"
+                (click)="quickAddForm.tipoRegistro.set('aporte')">
+                💰 Aporte
+              </button>
+            </div>
+          </div>
+
+          <!-- Categoría -->
+          <div class="form-group">
+            <label>Categoría *</label>
+            <select [(ngModel)]="quickAddForm.categoriaId" class="form-input">
+              <option value="">Seleccionar categoría</option>
+              <option [value]="ahorroCategory()?._id">{{ ahorroCategory()?.icono }} {{ ahorroCategory()?.nombre }}</option>
+              <option [value]="arriendoCategory()?._id">{{ arriendoCategory()?.icono }} {{ arriendoCategory()?.nombre }}</option>
+              <option [value]="creditoCategory()?._id">{{ creditoCategory()?.icono }} {{ creditoCategory()?.nombre }}</option>
+              <option [value]="liquidoCategory()?._id">{{ liquidoCategory()?.icono }} {{ liquidoCategory()?.nombre }}</option>
+            </select>
+          </div>
+
+          <!-- Tipo de Gasto (solo si es gasto) -->
+          @if (quickAddForm.tipoRegistro() === 'gasto') {
+            <div class="form-group">
+              <label>Tipo de gasto *</label>
+              <div class="toggle-buttons">
+                <button
+                  class="toggle-btn"
+                  [class.active]="quickAddForm.tipoGasto() === 'variable'"
+                  (click)="quickAddForm.tipoGasto.set('variable')">
+                  📝 Variable
+                </button>
+                <button
+                  class="toggle-btn"
+                  [class.active]="quickAddForm.tipoGasto() === 'fijo'"
+                  (click)="quickAddForm.tipoGasto.set('fijo')">
+                  🔄 Fijo
+                </button>
+              </div>
+            </div>
+
+            <!-- Opciones de Gasto Fijo -->
+            @if (quickAddForm.tipoGasto() === 'fijo') {
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    [(ngModel)]="quickAddForm.esPermanente">
+                  <span>¿Es un gasto permanente?</span>
+                </label>
+                <small>Si no es permanente, se copiará solo por el número de períodos definidos</small>
+              </div>
+
+              @if (!quickAddForm.esPermanente) {
+                <div class="form-group">
+                  <label>Períodos restantes (cuotas) *</label>
+                  <input
+                    type="number"
+                    [(ngModel)]="quickAddForm.periodosRestantes"
+                    placeholder="Ej: 5"
+                    min="1"
+                    class="form-input">
+                  <small>Número de veces que se copiará este gasto</small>
+                </div>
+              }
+            }
+          }
+
+          <!-- Es Aporte Fijo (solo si es aporte) -->
+          @if (quickAddForm.tipoRegistro() === 'aporte') {
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input
+                  type="checkbox"
+                  [(ngModel)]="quickAddForm.esAporteFijo">
+                <span>¿Es un aporte fijo?</span>
+              </label>
+              <small>Los aportes fijos se copian automáticamente cada período</small>
+            </div>
+          }
+
+          <!-- Nombre -->
+          <div class="form-group">
+            <label>Nombre *</label>
+            <input
+              type="text"
+              [(ngModel)]="quickAddForm.nombre"
+              placeholder="Ej: Pizza, Netflix, Arriendo"
+              class="form-input">
+          </div>
+
+          <!-- Monto -->
+          <div class="form-group">
+            <label>Monto *</label>
+            <input
+              type="number"
+              [(ngModel)]="quickAddForm.monto"
+              placeholder="0"
+              min="0"
+              step="1000"
+              class="form-input">
+          </div>
+
+          <!-- Descripción -->
+          <div class="form-group">
+            <label>Descripción (opcional)</label>
+            <textarea
+              [(ngModel)]="quickAddForm.descripcion"
+              placeholder="Notas adicionales"
+              class="form-input"
+              rows="2"></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-secondary" (click)="closeQuickAddModal()">
+            Cancelar
+          </button>
+          <button class="btn-primary" (click)="saveQuickAdd()">
+            Guardar
+          </button>
+        </div>
       </div>
     </div>
   }

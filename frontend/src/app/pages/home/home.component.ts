@@ -6,7 +6,8 @@ import { AuthService } from '../../services/auth.service';
 import { PeriodService } from '../../services/period.service';
 import { CategoryService } from '../../services/category.service';
 import { ExpenseService } from '../../services/expense.service';
-import { Period, TipoPeriodo, Category } from '../../models';
+import { AporteService } from '../../services/aporte.service';
+import { Period, TipoPeriodo, Category, TipoGasto } from '../../models';
 import { InitialSetupModalComponent } from '../../components/initial-setup-modal/initial-setup-modal.component';
 import { CategoryDetailModalComponent } from '../../components/category-detail-modal/category-detail-modal.component';
 
@@ -24,6 +25,21 @@ export class HomeComponent implements OnInit {
   showCategoryModal = signal(false);
   showEditSueldoModal = signal(false);
   editSueldoValue = signal(0);
+  showQuickAddModal = signal(false);
+
+  // Form para agregar gasto/aporte rápido
+  quickAddForm = {
+    tipoRegistro: signal<'gasto' | 'aporte'>('gasto'),
+    tipoGasto: signal<'fijo' | 'variable'>('variable'),
+    categoriaId: '',
+    nombre: '',
+    monto: 0,
+    descripcion: '',
+    esPermanente: false,
+    periodosRestantes: 1,
+    esAporteFijo: false
+  };
+
   selectedCategory = signal<Category | null>(null);
   selectedCategoryMeta = signal<number | undefined>(undefined);
   selectedPeriodId = signal<string>('');
@@ -120,7 +136,8 @@ export class HomeComponent implements OnInit {
     public authService: AuthService,
     public periodService: PeriodService,
     public categoryService: CategoryService,
-    private expenseService: ExpenseService
+    private expenseService: ExpenseService,
+    private aporteService: AporteService
   ) {}
 
   ngOnInit() {
@@ -411,16 +428,137 @@ export class HomeComponent implements OnInit {
     }
 
     try {
-      // TODO: Llamar al endpoint para actualizar el sueldo del período
       await this.periodService.updatePeriod(period._id, { sueldo: newSueldo }).toPromise();
-
       this.closeEditSueldoModal();
-
-      // Recargar el dashboard
       await this.loadDashboardData();
     } catch (error) {
       console.error('Error updating sueldo:', error);
       alert('Error al actualizar el sueldo');
     }
+  }
+
+  // ==================
+  // QUICK ADD MODAL
+  // ==================
+
+  openQuickAddModal() {
+    this.resetQuickAddForm();
+    this.showQuickAddModal.set(true);
+  }
+
+  closeQuickAddModal() {
+    this.showQuickAddModal.set(false);
+    this.resetQuickAddForm();
+  }
+
+  resetQuickAddForm() {
+    this.quickAddForm.tipoRegistro.set('gasto');
+    this.quickAddForm.tipoGasto.set('variable');
+    this.quickAddForm.categoriaId = '';
+    this.quickAddForm.nombre = '';
+    this.quickAddForm.monto = 0;
+    this.quickAddForm.descripcion = '';
+    this.quickAddForm.esPermanente = false;
+    this.quickAddForm.periodosRestantes = 1;
+    this.quickAddForm.esAporteFijo = false;
+  }
+
+  async saveQuickAdd() {
+    const form = this.quickAddForm;
+
+    // Validaciones
+    if (!form.categoriaId) {
+      alert('Debes seleccionar una categoría');
+      return;
+    }
+
+    if (!form.nombre || form.nombre.trim() === '') {
+      alert('Debes ingresar un nombre');
+      return;
+    }
+
+    if (form.monto <= 0) {
+      alert('El monto debe ser mayor a 0');
+      return;
+    }
+
+    try {
+      if (form.tipoRegistro() === 'gasto') {
+        await this.saveQuickAddExpense();
+      } else {
+        await this.saveQuickAddAporte();
+      }
+
+      this.closeQuickAddModal();
+      await this.loadDashboardData();
+    } catch (error) {
+      console.error('Error saving quick add:', error);
+      alert('Error al guardar el registro');
+    }
+  }
+
+  private async saveQuickAddExpense() {
+    const form = this.quickAddForm;
+
+    // Determinar el período correcto según la categoría
+    let periodoId = '';
+
+    if (form.categoriaId === this.creditoCategory()?._id) {
+      // Gastos de crédito van al período de crédito
+      const creditPeriod = this.creditPeriod();
+      if (!creditPeriod) {
+        throw new Error('No hay período de crédito activo');
+      }
+      periodoId = creditPeriod._id;
+    } else {
+      // Gastos de otras categorías van al período mensual
+      const mensualPeriod = this.periodService.activeMensualPeriod();
+      if (!mensualPeriod) {
+        throw new Error('No hay período mensual activo');
+      }
+      periodoId = mensualPeriod._id;
+    }
+
+    const expenseData = {
+      categoria_id: form.categoriaId,
+      nombre: form.nombre,
+      monto: form.monto,
+      tipo: (form.tipoGasto() === 'fijo' ? TipoGasto.FIJO : TipoGasto.VARIABLE),
+      es_permanente: form.tipoGasto() === 'fijo' ? form.esPermanente : undefined,
+      periodos_restantes: form.tipoGasto() === 'fijo' && !form.esPermanente ? form.periodosRestantes : undefined,
+      descripcion: form.descripcion || undefined
+    };
+
+    return new Promise<void>((resolve, reject) => {
+      this.expenseService.createExpense(periodoId, expenseData).subscribe({
+        next: () => resolve(),
+        error: (err) => reject(err)
+      });
+    });
+  }
+
+  private async saveQuickAddAporte() {
+    const form = this.quickAddForm;
+
+    // Los aportes siempre van al período mensual
+    const mensualPeriod = this.periodService.activeMensualPeriod();
+    if (!mensualPeriod) {
+      throw new Error('No hay período mensual activo');
+    }
+
+    const aporteData = {
+      categoria_id: form.categoriaId,
+      nombre: form.nombre,
+      monto: form.monto,
+      es_fijo: form.esAporteFijo,
+      descripcion: form.descripcion || undefined
+    };
+
+    return new Promise<void>((resolve, reject) => {
+      this.aporteService.createAporte(mensualPeriod._id, aporteData).subscribe({
+        next: () => resolve(),
+        error: (err) => reject(err)
+      });
+    });
   }
 }
