@@ -189,6 +189,7 @@ async def get_period_summary(
     categories_summary = []
     categoria_ahorro_id = None
     categoria_arriendo_id = None
+    categoria_liquidez_id = None
 
     # Obtener el período de crédito activo para calcular gastos de crédito
     periodo_credito = await period_crud.get_active(
@@ -218,11 +219,13 @@ async def get_period_summary(
         # DEBUG: Log de totales por categoría
         print(f"DEBUG: Categoría {cat.nombre} ({cat.slug}): periodo_usado={periodo_para_gastos}, gastos=${total_gastos}, aportes=${total_aportes}, total_real=${total_real}")
 
-        # Guardar IDs de categorías ahorro y arriendo para calcular liquidez
+        # Guardar IDs de categorías ahorro, arriendo y liquidez para calcular liquidez
         if cat.slug == TipoCategoria.AHORRO:
             categoria_ahorro_id = cat_id
         elif cat.slug == TipoCategoria.ARRIENDO:
             categoria_arriendo_id = cat_id
+        elif cat.slug == TipoCategoria.LIQUIDEZ:
+            categoria_liquidez_id = cat_id
 
         # Obtener meta si aplica
         # NOTA: Solo Crédito tiene meta real. Ahorro y Arriendo usan total_real como "meta"
@@ -253,7 +256,8 @@ async def get_period_summary(
             str(current_user.id),
             period,
             categoria_ahorro_id,
-            categoria_arriendo_id
+            categoria_arriendo_id,
+            categoria_liquidez_id
         )
 
     return PeriodSummaryResponse(

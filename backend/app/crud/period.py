@@ -410,17 +410,22 @@ class PeriodCRUD:
         user_id: str,
         period: PeriodInDB,
         categoria_ahorro_id: str,
-        categoria_arriendo_id: str
+        categoria_arriendo_id: str,
+        categoria_liquidez_id: Optional[str] = None
     ) -> float:
         """
         Calcular liquidez según LOGICA_SISTEMA.md
 
-        Fórmula: liquidez = sueldo - total_ahorro_real - total_arriendo_real - credito_periodo_anterior
+        Fórmula completa:
+        1. liquidez_inicial = sueldo - total_ahorro_real - total_arriendo_real - credito_periodo_anterior
+        2. liquidez_disponible = liquidez_inicial - gastos_liquidez + aportes_liquidez
 
         Donde:
         - total_ahorro_real = gastos_ahorro - aportes_ahorro
         - total_arriendo_real = gastos_arriendo - aportes_arriendo
         - credito_periodo_anterior = total_gastado del período de crédito cerrado más reciente
+        - gastos_liquidez = gastos fijos + gastos variables de la categoría liquidez
+        - aportes_liquidez = aportes a la categoría liquidez
 
         NOTA: Ahorro NO tiene meta, se calcula como suma de gastos - aportes
         """
@@ -442,13 +447,35 @@ class PeriodCRUD:
         previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
         credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
 
-        # Aplicar fórmula
-        liquidez = (
+        # Calcular liquidez inicial
+        liquidez_inicial = (
             period.sueldo -
             total_ahorro_real -
             total_arriendo_real -
             credito_anterior
         )
+
+        # Si se proporciona categoria_liquidez_id, calcular liquidez disponible
+        if categoria_liquidez_id and self.expense_crud and self.aporte_crud:
+            # Obtener gastos de liquidez (fijos + variables)
+            gastos_liquidez = await self.expense_crud.calculate_total_by_categoria(
+                user_id,
+                str(period.id),
+                categoria_liquidez_id
+            )
+
+            # Obtener aportes de liquidez
+            aportes_liquidez = await self.aporte_crud.calculate_total_by_categoria(
+                user_id,
+                str(period.id),
+                categoria_liquidez_id
+            )
+
+            # liquidez_disponible = liquidez_inicial - gastos + aportes
+            liquidez = liquidez_inicial - gastos_liquidez + aportes_liquidez
+        else:
+            # Si no se proporciona categoría liquidez, devolver solo liquidez inicial
+            liquidez = liquidez_inicial
 
         return liquidez
 
