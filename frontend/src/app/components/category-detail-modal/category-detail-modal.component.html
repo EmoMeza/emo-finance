@@ -31,7 +31,9 @@
         (click)="setActiveTab('variables')">
         📝 Gastos Variables
       </button>
+      <!-- Ocultar pestaña de Aportes si es Crédito -->
       <button
+        *ngIf="!isCredito()"
         class="tab"
         [class.active]="activeTab() === 'aportes'"
         (click)="setActiveTab('aportes')">
@@ -45,33 +47,108 @@
       <!-- PESTAÑA: RESUMEN -->
       <div *ngIf="activeTab() === 'resumen'" class="tab-panel">
         <div class="summary-section">
-          <div class="summary-row" *ngIf="meta">
-            <span class="summary-label">Meta/Presupuesto:</span>
-            <span class="summary-value">{{ formatCurrency(meta) }}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Total Gastos Fijos:</span>
-            <span class="summary-value">{{ formatCurrency(totalGastosFijos()) }}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Total Gastos Variables:</span>
-            <span class="summary-value">{{ formatCurrency(totalGastosVariables()) }}</span>
-          </div>
-          <div class="summary-row">
-            <span class="summary-label">Total Aportes:</span>
-            <span class="summary-value negative">-{{ formatCurrency(totalAportes()) }}</span>
-          </div>
-          <hr>
-          <div class="summary-row total">
-            <span class="summary-label">TOTAL REAL:</span>
-            <span class="summary-value">{{ formatCurrency(totalReal()) }}</span>
-          </div>
-          <div class="summary-row" *ngIf="meta">
-            <span class="summary-label">Disponible:</span>
-            <span class="summary-value" [class.negative]="disponible() < 0">
-              {{ formatCurrency(disponible()) }}
+
+          <!-- Mostrar fechas del período si es Crédito -->
+          <div *ngIf="isCredito() && periodoFechaInicio && periodoFechaFin" class="period-dates">
+            <span class="period-icon">📅</span>
+            <span class="period-text">
+              Período de Crédito: {{ formatDate(periodoFechaInicio) }} - {{ formatDate(periodoFechaFin) }}
             </span>
           </div>
+
+          <!-- META con opción de editar -->
+          <div class="summary-row meta-row" *ngIf="meta">
+            <span class="summary-label">
+              {{ isCredito() ? 'META DE CRÉDITO TOTAL:' : 'Meta/Presupuesto:' }}
+            </span>
+            <div class="meta-value-container">
+              <span class="summary-value" *ngIf="!editingMeta()">
+                {{ formatCurrency(meta) }}
+              </span>
+              <input
+                *ngIf="editingMeta()"
+                type="number"
+                [(ngModel)]="metaEditValue"
+                class="meta-edit-input"
+                [value]="metaEditValue()">
+              <button
+                *ngIf="!editingMeta()"
+                class="btn-edit-meta"
+                (click)="startEditingMeta()">
+                ✏️
+              </button>
+              <div *ngIf="editingMeta()" class="meta-edit-actions">
+                <button class="btn-save" (click)="saveMeta()">✓</button>
+                <button class="btn-cancel" (click)="cancelEditingMeta()">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <hr>
+
+          <!-- RESUMEN PARA CRÉDITO -->
+          <div *ngIf="isCredito()">
+            <div class="summary-row">
+              <span class="summary-label">Gastos Fijos:</span>
+              <span class="summary-value">{{ formatCurrency(totalGastosFijos()) }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Gastos Variables:</span>
+              <span class="summary-value">{{ formatCurrency(totalGastosVariables()) }}</span>
+            </div>
+            <hr>
+            <div class="summary-row total">
+              <span class="summary-label">TOTAL GASTADO:</span>
+              <span class="summary-value">{{ formatCurrency(totalGastado()) }}</span>
+            </div>
+            <div class="summary-row highlight" *ngIf="meta">
+              <span class="summary-label">CRÉDITO DISPONIBLE:</span>
+              <span class="summary-value big" [class.negative]="disponible() < 0">
+                {{ formatCurrency(disponible()) }}
+              </span>
+            </div>
+
+            <!-- Barra de progreso -->
+            <div class="progress-container" *ngIf="meta">
+              <div class="progress-bar">
+                <div class="progress-fill" [style.width.%]="getPorcentajeUsado()"></div>
+              </div>
+              <span class="progress-text">{{ getPorcentajeUsado() }}% usado</span>
+            </div>
+
+            <!-- Nota informativa -->
+            <div class="info-note">
+              ⚠️ Este monto se pagará en el próximo período mensual
+            </div>
+          </div>
+
+          <!-- RESUMEN PARA OTRAS CATEGORÍAS -->
+          <div *ngIf="!isCredito()">
+            <div class="summary-row">
+              <span class="summary-label">Total Gastos Fijos:</span>
+              <span class="summary-value">{{ formatCurrency(totalGastosFijos()) }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Total Gastos Variables:</span>
+              <span class="summary-value">{{ formatCurrency(totalGastosVariables()) }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="summary-label">Total Aportes:</span>
+              <span class="summary-value negative">-{{ formatCurrency(totalAportes()) }}</span>
+            </div>
+            <hr>
+            <div class="summary-row total">
+              <span class="summary-label">TOTAL REAL:</span>
+              <span class="summary-value">{{ formatCurrency(totalReal()) }}</span>
+            </div>
+            <div class="summary-row" *ngIf="meta">
+              <span class="summary-label">Disponible:</span>
+              <span class="summary-value" [class.negative]="disponible() < 0">
+                {{ formatCurrency(disponible()) }}
+              </span>
+            </div>
+          </div>
+
         </div>
       </div>
 

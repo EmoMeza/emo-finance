@@ -148,7 +148,10 @@
       [category]="selectedCategory()!"
       [periodoId]="selectedPeriodId()"
       [meta]="selectedCategoryMeta()"
+      [periodoFechaInicio]="selectedPeriodFechaInicio()"
+      [periodoFechaFin]="selectedPeriodFechaFin()"
       (close)="closeCategoryModal()"
+      (metaChanged)="onMetaChanged($event)"
     ></app-category-detail-modal>
   }
 </div>

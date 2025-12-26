@@ -18,14 +18,22 @@ export class CategoryDetailModalComponent implements OnInit {
   @Input() category!: Category;
   @Input() periodoId!: string;
   @Input() meta?: number;
+  @Input() periodoFechaInicio?: Date;
+  @Input() periodoFechaFin?: Date;
   @Output() close = new EventEmitter<void>();
+  @Output() metaChanged = new EventEmitter<number>();
 
   activeTab = signal<TabType>('resumen');
   showAddExpenseForm = signal(false);
   showAddAporteForm = signal(false);
+  editingMeta = signal(false);
+  metaEditValue = signal(0);
 
   // Tipo de gasto a agregar
   expenseType = signal<'fijo' | 'variable'>('fijo');
+
+  // Computed: Es categoría de crédito?
+  isCredito = computed(() => this.category.slug === 'credito');
 
   // Formulario de gasto fijo
   expenseForm = {
@@ -81,10 +89,20 @@ export class CategoryDetailModalComponent implements OnInit {
     this.aportes().reduce((sum, a) => sum + a.monto, 0)
   );
 
-  totalReal = computed(() =>
-    this.totalGastosFijos() + this.totalGastosVariables() - this.totalAportes()
+  // Para crédito: Total Gastado (sin restar aportes, porque no existen en crédito)
+  totalGastado = computed(() =>
+    this.totalGastosFijos() + this.totalGastosVariables()
   );
 
+  // Para otras categorías: Total Real (gastos - aportes)
+  totalReal = computed(() => {
+    if (this.isCredito()) {
+      return this.totalGastado();
+    }
+    return this.totalGastosFijos() + this.totalGastosVariables() - this.totalAportes();
+  });
+
+  // Crédito Disponible (para crédito) o Disponible (para otras categorías)
   disponible = computed(() => {
     if (this.meta) {
       return this.meta - this.totalReal();
@@ -98,11 +116,18 @@ export class CategoryDetailModalComponent implements OnInit {
   ) {}
 
   ngOnInit() {
+    // Inicializar valor de meta para edición
+    this.metaEditValue.set(this.meta || 0);
+
     // Cargar gastos y aportes de esta categoría
     console.log('DEBUG MODAL: ngOnInit', {
       categoria: this.category.nombre,
       periodoId: this.periodoId,
-      categoriaId: this.category._id
+      categoriaId: this.category._id,
+      isCredito: this.isCredito(),
+      meta: this.meta,
+      periodoFechaInicio: this.periodoFechaInicio,
+      periodoFechaFin: this.periodoFechaFin
     });
     this.loadCategoryData();
   }
@@ -113,6 +138,7 @@ export class CategoryDetailModalComponent implements OnInit {
       categoriaId: this.category._id
     });
 
+    // Cargar gastos (todos tienen gastos)
     this.expenseService.getExpenses(this.periodoId, undefined, this.category._id).subscribe(expenses => {
       console.log('DEBUG MODAL: Expenses cargados:', expenses);
       console.log('DEBUG MODAL: Total expenses en servicio:', this.expenseService.expenses());
@@ -120,11 +146,14 @@ export class CategoryDetailModalComponent implements OnInit {
       console.log('DEBUG MODAL: Gastos variables filtrados:', this.gastosVariables());
     });
 
-    this.aporteService.getAportes(this.periodoId, undefined, this.category._id).subscribe(aportes => {
-      console.log('DEBUG MODAL: Aportes cargados:', aportes);
-      console.log('DEBUG MODAL: Total aportes en servicio:', this.aporteService.aportes());
-      console.log('DEBUG MODAL: Aportes filtrados:', this.aportes());
-    });
+    // Solo cargar aportes si NO es crédito
+    if (!this.isCredito()) {
+      this.aporteService.getAportes(this.periodoId, undefined, this.category._id).subscribe(aportes => {
+        console.log('DEBUG MODAL: Aportes cargados:', aportes);
+        console.log('DEBUG MODAL: Total aportes en servicio:', this.aporteService.aportes());
+        console.log('DEBUG MODAL: Aportes filtrados:', this.aportes());
+      });
+    }
   }
 
   setActiveTab(tab: TabType) {
@@ -286,5 +315,47 @@ export class CategoryDetailModalComponent implements OnInit {
 
   getAporteLabel(aporte: Aporte): string {
     return aporte.es_fijo ? `${aporte.nombre} (Fijo)` : aporte.nombre;
+  }
+
+  // ==================
+  // EDITAR META
+  // ==================
+
+  startEditingMeta() {
+    this.metaEditValue.set(this.meta || 0);
+    this.editingMeta.set(true);
+  }
+
+  cancelEditingMeta() {
+    this.editingMeta.set(false);
+    this.metaEditValue.set(this.meta || 0);
+  }
+
+  saveMeta() {
+    if (this.metaEditValue() <= 0) {
+      alert('La meta debe ser mayor a 0');
+      return;
+    }
+
+    this.metaChanged.emit(this.metaEditValue());
+    this.editingMeta.set(false);
+  }
+
+  // ==================
+  // HELPERS
+  // ==================
+
+  formatDate(date?: Date): string {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('es-CL', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  }
+
+  getPorcentajeUsado(): number {
+    if (!this.meta || this.meta === 0) return 0;
+    return Math.round((this.totalReal() / this.meta) * 100);
   }
 }

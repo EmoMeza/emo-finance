@@ -25,6 +25,8 @@ export class HomeComponent implements OnInit {
   selectedCategory = signal<Category | null>(null);
   selectedCategoryMeta = signal<number | undefined>(undefined);
   selectedPeriodId = signal<string>('');
+  selectedPeriodFechaInicio = signal<Date | undefined>(undefined);
+  selectedPeriodFechaFin = signal<Date | undefined>(undefined);
   creditPeriod = signal<Period | null>(null);
   isFirstTimeSetup = signal(false);
 
@@ -92,7 +94,13 @@ export class HomeComponent implements OnInit {
 
   // Computed para metas de categorías
   // NOTA: Solo Crédito tiene meta real. Ahorro y Arriendo usan total_real
-  metaCredito = computed(() => this.creditoSummary()?.meta ?? 0);
+  metaCredito = computed(() => {
+    // La meta de crédito viene del período de crédito, no del mensual
+    const creditPeriod = this.creditPeriod();
+    const meta = creditPeriod?.metas_categorias?.credito_usable ?? 0;
+    console.log('DEBUG: metaCredito computed', { creditPeriod, meta });
+    return meta;
+  });
 
   // Computed para porcentajes
   porcentajeAhorro = computed(() => this.calculatePercentage(this.ahorro()));
@@ -248,10 +256,18 @@ export class HomeComponent implements OnInit {
   // CATEGORY DETAIL MODAL
   // ==================
 
-  openCategoryModal(category: Category, periodId: string, meta?: number) {
+  openCategoryModal(
+    category: Category,
+    periodId: string,
+    meta?: number,
+    fechaInicio?: Date,
+    fechaFin?: Date
+  ) {
     this.selectedCategory.set(category);
     this.selectedCategoryMeta.set(meta);
     this.selectedPeriodId.set(periodId);
+    this.selectedPeriodFechaInicio.set(fechaInicio);
+    this.selectedPeriodFechaFin.set(fechaFin);
     this.showCategoryModal.set(true);
   }
 
@@ -260,6 +276,8 @@ export class HomeComponent implements OnInit {
     this.selectedCategory.set(null);
     this.selectedCategoryMeta.set(undefined);
     this.selectedPeriodId.set('');
+    this.selectedPeriodFechaInicio.set(undefined);
+    this.selectedPeriodFechaFin.set(undefined);
 
     // Recargar el summary para actualizar los totales en el dashboard
     const period = this.periodService.activeMensualPeriod();
@@ -270,39 +288,94 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  async onMetaChanged(newMeta: number) {
+    // Actualizar la meta en el período correspondiente
+    const category = this.selectedCategory();
+    const periodId = this.selectedPeriodId();
+
+    if (!category || !periodId) return;
+
+    try {
+      // TODO: Implementar endpoint para actualizar meta del período
+      console.log('META CHANGED:', {
+        category: category.slug,
+        periodId,
+        newMeta
+      });
+
+      // Por ahora, solo actualizar localmente y recargar
+      this.selectedCategoryMeta.set(newMeta);
+
+      // Recargar summary
+      this.periodService.getPeriodSummary(periodId).subscribe({
+        next: () => {
+          console.log('Summary recargado después de cambiar meta');
+        },
+        error: (err) => console.error('Error reloading summary:', err)
+      });
+    } catch (error) {
+      console.error('Error updating meta:', error);
+      alert('Error al actualizar la meta');
+    }
+  }
+
   // Métodos auxiliares para abrir modales de categorías específicas
   openAhorroModal() {
     const category = this.ahorroCategory();
-    const periodId = this.periodService.activeMensualPeriod()?._id;
-    if (category && periodId) {
+    const period = this.periodService.activeMensualPeriod();
+    if (category && period) {
       // Ahorro NO tiene meta, se calcula como suma de gastos - aportes
-      this.openCategoryModal(category, periodId, undefined);
+      this.openCategoryModal(
+        category,
+        period._id,
+        undefined,
+        new Date(period.fecha_inicio),
+        new Date(period.fecha_fin)
+      );
     }
   }
 
   openArriendoModal() {
     const category = this.arriendoCategory();
-    const periodId = this.periodService.activeMensualPeriod()?._id;
-    if (category && periodId) {
+    const period = this.periodService.activeMensualPeriod();
+    if (category && period) {
       // Arriendo NO tiene meta, se calcula como suma de gastos - aportes
-      this.openCategoryModal(category, periodId, undefined);
+      this.openCategoryModal(
+        category,
+        period._id,
+        undefined,
+        new Date(period.fecha_inicio),
+        new Date(period.fecha_fin)
+      );
     }
   }
 
   openCreditoModal() {
     const category = this.creditoCategory();
-    const periodId = this.creditPeriod()?._id; // Usa período de crédito
-    if (category && periodId) {
-      this.openCategoryModal(category, periodId, this.metaCredito());
+    const period = this.creditPeriod(); // Usa período de crédito
+    if (category && period) {
+      this.openCategoryModal(
+        category,
+        period._id,
+        this.metaCredito(),
+        new Date(period.fecha_inicio),
+        new Date(period.fecha_fin)
+      );
     }
   }
 
   openLiquidoModal() {
     const category = this.liquidoCategory();
-    const periodId = this.periodService.activeMensualPeriod()?._id;
-    if (category && periodId) {
+    const period = this.periodService.activeMensualPeriod();
+    if (category && period) {
       // Liquidez no tiene meta fija, se calcula automáticamente
-      this.openCategoryModal(category, periodId, undefined);
+      this.openCategoryModal(
+        category,
+        period._id,
+        undefined,
+        new Date(period.fecha_inicio),
+        new Date(period.fecha_fin)
+      );
     }
   }
 }
