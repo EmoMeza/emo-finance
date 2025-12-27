@@ -3,6 +3,7 @@ Endpoints de administración.
 Solo accesibles para usuarios con rol ADMIN.
 """
 from typing import List
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.database import get_database
 from app.api.dependencies_admin import get_current_admin_user
@@ -60,7 +61,18 @@ async def create_user_by_admin(
     Solo accesible para administradores.
 
     El administrador puede crear usuarios con rol 'user' o 'admin'.
+
+    NOTE: User creation is blocked between day 25 and end of month to prevent
+    credit cycle misalignment issues.
     """
+    # Check if current day is between 25 and end of month
+    current_date = datetime.utcnow()
+    if current_date.day >= 25:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User creation is temporarily unavailable from day 25 to end of month. Please create users between day 1 and 24 to ensure proper credit cycle configuration."
+        )
+
     user_crud = UserCRUD(db)
 
     # Verificar si el username ya existe

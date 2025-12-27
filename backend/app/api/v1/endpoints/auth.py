@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.core.config import settings
 from app.core.database import get_database
@@ -21,7 +21,18 @@ async def register(user_data: UserCreate, db=Depends(get_database)):
     - **first_name**: User's first name
     - **last_name**: User's last name
     - **password**: Strong password (min 8 characters)
+
+    NOTE: Registration is blocked between day 25 and end of month to prevent
+    credit cycle misalignment issues.
     """
+    # Check if current day is between 25 and end of month
+    current_date = datetime.utcnow()
+    if current_date.day >= 25:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Registration is temporarily unavailable from day 25 to end of month. Please register between day 1 and 24 to ensure proper credit cycle configuration."
+        )
+
     user_crud = UserCRUD(db)
 
     # Check if email already exists
