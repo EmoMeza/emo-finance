@@ -112,11 +112,61 @@ class PeriodCRUD:
         """
         Actualizar un período
         Permite editar sueldo, metas, estado y total_gastado
+
+        CASO ESPECIAL: Si se está actualizando total_gastado de un período de crédito
+        y es el primer período del usuario, crear automáticamente un período cerrado
+        anterior para que la lógica de liquidez funcione correctamente.
         """
         update_data = period_update.model_dump(exclude_none=True)
 
         if not update_data:
             return await self.get_by_id(user_id, period_id)
+
+        # Obtener el período actual para verificar si es de crédito
+        current_period = await self.get_by_id(user_id, period_id)
+        if not current_period:
+            return None
+
+        # CASO ESPECIAL: Crear período cerrado anterior para el setup inicial
+        if (
+            'total_gastado' in update_data and
+            current_period.tipo_periodo == TipoPeriodo.CICLO_CREDITO
+        ):
+            # Verificar si ya existe un período cerrado anterior
+            previous_closed = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
+
+            # Si no existe período cerrado anterior, crear uno con el valor inicial
+            if not previous_closed:
+                credito_inicial = update_data['total_gastado']
+                print(f"DEBUG: Creando período de crédito cerrado anterior con total_gastado={credito_inicial}")
+
+                # Calcular fechas del período anterior
+                # Si el período actual es del 25 dic - 24 ene,
+                # el anterior sería 25 nov - 24 dic
+                fecha_inicio_anterior = current_period.fecha_inicio - timedelta(days=30)
+                fecha_fin_anterior = current_period.fecha_inicio - timedelta(microseconds=1)
+
+                # Crear período anterior CERRADO
+                previous_period_data = {
+                    "user_id": ObjectId(user_id),
+                    "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
+                    "fecha_inicio": fecha_inicio_anterior,
+                    "fecha_fin": fecha_fin_anterior,
+                    "sueldo": 0,
+                    "metas_categorias": current_period.metas_categorias.model_dump(),
+                    "estado": EstadoPeriodo.CERRADO,
+                    "categorias": current_period.categorias if hasattr(current_period, 'categorias') else [],
+                    "total_gastado": credito_inicial,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+
+                await self.collection.insert_one(previous_period_data)
+                print(f"DEBUG: Período cerrado anterior creado: {fecha_inicio_anterior} - {fecha_fin_anterior}")
+
+                # Ahora resetear el total_gastado del período actual a 0
+                # porque el crédito anterior ya está en el período cerrado
+                update_data['total_gastado'] = 0
 
         update_data["updated_at"] = datetime.utcnow()
 
@@ -444,29 +494,8 @@ class PeriodCRUD:
         )
 
         # Obtener crédito del período anterior
-        # El crédito a pagar en este mes es el del período de crédito que termina durante este mes
-        # Primero intentar buscar un período cerrado (flujo normal después del primer mes)
+        # Buscar el período de crédito cerrado más reciente
         previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
-
-        # Si no hay período cerrado (caso del primer mes o transición), buscar cualquier
-        # período de crédito cuya fecha_fin esté dentro del período mensual actual
-        if not previous_credit_period:
-            # Buscar todos los períodos de crédito del usuario
-            all_credit_periods = await self.collection.find(
-                {
-                    "user_id": ObjectId(user_id),
-                    "tipo_periodo": TipoPeriodo.CICLO_CREDITO
-                }
-            ).to_list(length=None)
-
-            # Buscar el período de crédito cuya fecha_fin cae dentro del período mensual
-            for cp in all_credit_periods:
-                cp_period = PeriodInDB(**cp)
-                # Verificar si fecha_fin del crédito está dentro del período mensual
-                if period.fecha_inicio <= cp_period.fecha_fin <= period.fecha_fin:
-                    previous_credit_period = cp_period
-                    break
-
         credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
 
         # Calcular liquidez inicial
