@@ -448,22 +448,24 @@ class PeriodCRUD:
         # Primero intentar buscar un período cerrado (flujo normal después del primer mes)
         previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
 
-        # Si no hay período cerrado (caso del primer mes), buscar el período de crédito
-        # cuya fecha_fin esté dentro del período mensual actual
+        # Si no hay período cerrado (caso del primer mes o transición), buscar cualquier
+        # período de crédito cuya fecha_fin esté dentro del período mensual actual
         if not previous_credit_period:
-            # Buscar período de crédito que termina en este mes (puede estar ACTIVO o CERRADO)
-            credit_period = await self.collection.find_one(
+            # Buscar todos los períodos de crédito del usuario
+            all_credit_periods = await self.collection.find(
                 {
                     "user_id": ObjectId(user_id),
-                    "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
-                    "fecha_fin": {
-                        "$gte": period.fecha_inicio,
-                        "$lte": period.fecha_fin
-                    }
+                    "tipo_periodo": TipoPeriodo.CICLO_CREDITO
                 }
-            )
-            if credit_period:
-                previous_credit_period = PeriodInDB(**credit_period)
+            ).to_list(length=None)
+
+            # Buscar el período de crédito cuya fecha_fin cae dentro del período mensual
+            for cp in all_credit_periods:
+                cp_period = PeriodInDB(**cp)
+                # Verificar si fecha_fin del crédito está dentro del período mensual
+                if period.fecha_inicio <= cp_period.fecha_fin <= period.fecha_fin:
+                    previous_credit_period = cp_period
+                    break
 
         credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
 
