@@ -29,6 +29,10 @@ export class CategoryDetailModalComponent implements OnInit {
   editingMeta = signal(false);
   metaEditValue = signal(0);
 
+  // Control de edición
+  editingExpenseId = signal<string | null>(null);
+  editingAporteId = signal<string | null>(null);
+
   // Tipo de gasto a agregar
   expenseType = signal<'fijo' | 'variable'>('fijo');
 
@@ -170,7 +174,20 @@ export class CategoryDetailModalComponent implements OnInit {
 
   openAddExpenseForm(tipo: 'fijo' | 'variable') {
     this.expenseType.set(tipo);
+    this.editingExpenseId.set(null);
     this.resetExpenseForm();
+    this.showAddExpenseForm.set(true);
+  }
+
+  editExpense(expense: Expense) {
+    this.editingExpenseId.set(expense._id);
+    this.expenseType.set(expense.tipo === TipoGasto.FIJO ? 'fijo' : 'variable');
+    this.expenseForm.nombre = expense.nombre;
+    this.expenseForm.monto = expense.monto;
+    this.expenseForm.tipo = expense.tipo;
+    this.expenseForm.es_permanente = expense.es_permanente ?? true;
+    this.expenseForm.periodos_restantes = expense.periodos_restantes ?? 0;
+    this.expenseForm.descripcion = expense.descripcion ?? '';
     this.showAddExpenseForm.set(true);
   }
 
@@ -185,6 +202,7 @@ export class CategoryDetailModalComponent implements OnInit {
 
   cancelExpenseForm() {
     this.showAddExpenseForm.set(false);
+    this.editingExpenseId.set(null);
     this.resetExpenseForm();
   }
 
@@ -195,31 +213,39 @@ export class CategoryDetailModalComponent implements OnInit {
     }
 
     try {
-      const expenseCreate: any = {
+      const expenseData: any = {
         nombre: this.expenseForm.nombre,
         monto: this.expenseForm.monto,
-        categoria_id: this.category._id,
-        tipo: this.expenseForm.tipo,
         descripcion: this.expenseForm.descripcion || undefined
       };
 
       // Solo agregar campos de gasto fijo si corresponde
       if (this.expenseType() === 'fijo') {
-        expenseCreate.es_permanente = this.expenseForm.es_permanente;
+        expenseData.es_permanente = this.expenseForm.es_permanente;
 
         if (!this.expenseForm.es_permanente) {
-          expenseCreate.periodos_restantes = this.expenseForm.periodos_restantes;
+          expenseData.periodos_restantes = this.expenseForm.periodos_restantes;
         }
       }
 
-      await this.expenseService.createExpense(this.periodoId, expenseCreate).toPromise();
+      const editingId = this.editingExpenseId();
+      if (editingId) {
+        // Actualizar gasto existente
+        await this.expenseService.updateExpense(editingId, expenseData).toPromise();
+      } else {
+        // Crear nuevo gasto
+        expenseData.categoria_id = this.category._id;
+        expenseData.tipo = this.expenseForm.tipo;
+        await this.expenseService.createExpense(this.periodoId, expenseData).toPromise();
+      }
 
       this.showAddExpenseForm.set(false);
+      this.editingExpenseId.set(null);
       this.resetExpenseForm();
       this.loadCategoryData();
     } catch (error) {
-      console.error('Error al crear gasto:', error);
-      alert('Error al crear el gasto');
+      console.error('Error al guardar gasto:', error);
+      alert('Error al guardar el gasto');
     }
   }
 
@@ -240,7 +266,17 @@ export class CategoryDetailModalComponent implements OnInit {
   // ==================
 
   openAddAporteForm() {
+    this.editingAporteId.set(null);
     this.resetAporteForm();
+    this.showAddAporteForm.set(true);
+  }
+
+  editAporte(aporte: Aporte) {
+    this.editingAporteId.set(aporte._id);
+    this.aporteForm.nombre = aporte.nombre;
+    this.aporteForm.monto = aporte.monto;
+    this.aporteForm.es_fijo = aporte.es_fijo ?? true;
+    this.aporteForm.descripcion = aporte.descripcion ?? '';
     this.showAddAporteForm.set(true);
   }
 
@@ -253,6 +289,7 @@ export class CategoryDetailModalComponent implements OnInit {
 
   cancelAporteForm() {
     this.showAddAporteForm.set(false);
+    this.editingAporteId.set(null);
     this.resetAporteForm();
   }
 
@@ -263,22 +300,33 @@ export class CategoryDetailModalComponent implements OnInit {
     }
 
     try {
-      const aporteCreate = {
+      const aporteData = {
         nombre: this.aporteForm.nombre,
         monto: this.aporteForm.monto,
-        categoria_id: this.category._id,
         es_fijo: this.aporteForm.es_fijo,
         descripcion: this.aporteForm.descripcion || undefined
       };
 
-      await this.aporteService.createAporte(this.periodoId, aporteCreate).toPromise();
+      const editingId = this.editingAporteId();
+      if (editingId) {
+        // Actualizar aporte existente
+        await this.aporteService.updateAporte(editingId, aporteData).toPromise();
+      } else {
+        // Crear nuevo aporte
+        const aporteCreate = {
+          ...aporteData,
+          categoria_id: this.category._id
+        };
+        await this.aporteService.createAporte(this.periodoId, aporteCreate).toPromise();
+      }
 
       this.showAddAporteForm.set(false);
+      this.editingAporteId.set(null);
       this.resetAporteForm();
       this.loadCategoryData();
     } catch (error) {
-      console.error('Error al crear aporte:', error);
-      alert('Error al crear el aporte');
+      console.error('Error al guardar aporte:', error);
+      alert('Error al guardar el aporte');
     }
   }
 

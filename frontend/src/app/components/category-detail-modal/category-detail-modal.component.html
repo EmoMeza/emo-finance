@@ -163,7 +163,7 @@
 
         <!-- Formulario de agregar gasto fijo -->
         <div *ngIf="showAddExpenseForm() && expenseType() === 'fijo'" class="form-card">
-          <h4>Nuevo Gasto Fijo</h4>
+          <h4>{{ editingExpenseId() ? 'Editar Gasto Fijo' : 'Nuevo Gasto Fijo' }}</h4>
 
           <div class="form-group">
             <label>Nombre del gasto *</label>
@@ -237,6 +237,7 @@
             </div>
             <div class="item-actions">
               <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+              <button class="btn-edit" (click)="editExpense(expense)">✏️</button>
               <button class="btn-delete" (click)="deleteExpense(expense._id)">🗑️</button>
             </div>
           </div>
@@ -259,7 +260,7 @@
 
         <!-- Formulario de agregar gasto variable -->
         <div *ngIf="showAddExpenseForm() && expenseType() === 'variable'" class="form-card">
-          <h4>Nuevo Gasto Variable</h4>
+          <h4>{{ editingExpenseId() ? 'Editar Gasto Variable' : 'Nuevo Gasto Variable' }}</h4>
 
           <div class="form-group">
             <label>Nombre del gasto *</label>
@@ -311,6 +312,7 @@
             </div>
             <div class="item-actions">
               <span class="item-amount">{{ formatCurrency(expense.monto) }}</span>
+              <button class="btn-edit" (click)="editExpense(expense)">✏️</button>
               <button class="btn-delete" (click)="deleteExpense(expense._id)">🗑️</button>
             </div>
           </div>
@@ -333,7 +335,7 @@
 
         <!-- Formulario de agregar aporte -->
         <div *ngIf="showAddAporteForm()" class="form-card">
-          <h4>Nuevo Aporte</h4>
+          <h4>{{ editingAporteId() ? 'Editar Aporte' : 'Nuevo Aporte' }}</h4>
 
           <div class="form-group">
             <label>Nombre del aporte *</label>
@@ -395,6 +397,7 @@
             </div>
             <div class="item-actions">
               <span class="item-amount positive">+{{ formatCurrency(aporte.monto) }}</span>
+              <button class="btn-edit" (click)="editAporte(aporte)">✏️</button>
               <button class="btn-delete" (click)="deleteAporte(aporte._id)">🗑️</button>
             </div>
           </div>
