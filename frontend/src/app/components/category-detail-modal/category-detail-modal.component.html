@@ -54,6 +54,23 @@
             <span class="period-text">
               Período de Crédito: {{ formatDate(periodoFechaInicio) }} - {{ formatDate(periodoFechaFin) }}
             </span>
+            <div class="period-date-actions">
+              <button
+                *ngIf="!editingFechaFin()"
+                class="btn-edit-date"
+                (click)="startEditingFechaFin()"
+                title="Cambiar fecha de cierre">
+                ✏️ Cambiar
+              </button>
+              <div *ngIf="editingFechaFin()" class="date-edit-container">
+                <input
+                  type="date"
+                  [(ngModel)]="fechaFinEditValue"
+                  class="date-edit-input">
+                <button class="btn-save-date" (click)="saveFechaFin()">✓</button>
+                <button class="btn-cancel-date" (click)="cancelEditingFechaFin()">✕</button>
+              </div>
+            </div>
           </div>
 
           <!-- META con opción de editar -->

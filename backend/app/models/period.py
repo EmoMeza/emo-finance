@@ -72,12 +72,27 @@ class PeriodCreate(PeriodBase):
 class PeriodUpdate(BaseModel):
     """
     Esquema para actualizar un período
-    Permite editar sueldo, metas y estado
+    Permite editar sueldo, metas, estado y fecha_fin
     """
     sueldo: Optional[float] = Field(default=None, ge=0)
     metas_categorias: Optional[MetasCategorias] = None
     estado: Optional[EstadoPeriodo] = None
     total_gastado: Optional[float] = Field(default=None, ge=0)
+    fecha_fin: Optional[datetime] = Field(
+        default=None,
+        description="Fecha de fin del período (útil para ajustar fecha de cierre de tarjeta de crédito)"
+    )
+
+
+class PeriodCloseRequest(BaseModel):
+    """
+    Esquema para cerrar un período con fecha de fin opcional
+    Permite especificar una fecha de fin personalizada al cerrar
+    """
+    fecha_fin: Optional[datetime] = Field(
+        default=None,
+        description="Fecha de fin personalizada (ej: para ajustar fecha de cierre de tarjeta). Si no se proporciona, usa la fecha_fin actual del período"
+    )
 
 
 class PeriodInDB(PeriodBase):

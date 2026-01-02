@@ -338,6 +338,22 @@ export class HomeComponent implements OnInit {
     }
   }
 
+  async onPeriodChanged() {
+    // Recargar el período de crédito para obtener la fecha_fin actualizada
+    try {
+      await this.loadCreditPeriod();
+
+      // Actualizar las fechas en el modal si está abierto
+      const creditPeriod = this.creditPeriod();
+      if (creditPeriod) {
+        this.selectedPeriodFechaInicio.set(new Date(creditPeriod.fecha_inicio));
+        this.selectedPeriodFechaFin.set(new Date(creditPeriod.fecha_fin));
+      }
+    } catch (error) {
+      console.error('Error reloading period:', error);
+    }
+  }
+
   // Métodos auxiliares para abrir modales de categorías específicas
   openAhorroModal() {
     const category = this.ahorroCategory();

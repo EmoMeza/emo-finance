@@ -133,8 +133,9 @@ export class PeriodService {
   /**
    * Cerrar un período
    */
-  closePeriod(id: string): Observable<Period> {
-    return this.http.post<Period>(`${this.API_URL}${id}/close`, {}).pipe(
+  closePeriod(id: string, fechaFin?: Date): Observable<Period> {
+    const body = fechaFin ? { fecha_fin: fechaFin.toISOString() } : {};
+    return this.http.post<Period>(`${this.API_URL}${id}/close`, body).pipe(
       tap(closedPeriod => {
         this.periods.update(pers =>
           pers.map(per => per._id === id ? closedPeriod : per)

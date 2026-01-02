@@ -72,7 +72,8 @@ class PeriodCRUD:
         """
         Obtener el período activo de un tipo específico
 
-        Si no existe, lo crea automáticamente
+        Si no existe, lo crea automáticamente.
+        Si existe pero está vencido (fecha_fin < ahora), lo cierra automáticamente y crea uno nuevo.
         """
         period = await self.collection.find_one({
             "user_id": ObjectId(user_id),
@@ -81,7 +82,17 @@ class PeriodCRUD:
         })
 
         if period:
-            return PeriodInDB(**period)
+            period_obj = PeriodInDB(**period)
+            current_time = datetime.utcnow()
+
+            # Auto-cerrar si el período está vencido
+            if current_time > period_obj.fecha_fin:
+                print(f"🔄 AUTO-CLOSE: Período {tipo_periodo.value} expirado, cerrando...")
+                await self.close_period(user_id, str(period_obj.id))
+                print(f"✨ AUTO-CREATE: Creando nuevo período {tipo_periodo.value}...")
+                return await self._create_current_period(user_id, tipo_periodo)
+
+            return period_obj
 
         # No existe período activo, crear uno nuevo
         return await self._create_current_period(user_id, tipo_periodo)
@@ -178,10 +189,38 @@ class PeriodCRUD:
 
         return PeriodInDB(**result) if result else None
 
-    async def close_period(self, user_id: str, period_id: str) -> Optional[PeriodInDB]:
+    async def close_period(self, user_id: str, period_id: str, fecha_fin: Optional[datetime] = None) -> Optional[PeriodInDB]:
         """
         Cerrar un período (marcar como CERRADO)
+
+        Args:
+            user_id: ID del usuario
+            period_id: ID del período a cerrar
+            fecha_fin: Fecha de fin personalizada (opcional). Si se proporciona,
+                      actualiza la fecha_fin del período antes de cerrarlo.
+
+        Returns:
+            El período cerrado con la fecha_fin actualizada (si aplica)
         """
+        # Si se proporciona fecha_fin personalizada, actualizar primero
+        if fecha_fin:
+            # Obtener el período actual para verificar que existe
+            current_period = await self.get_by_id(user_id, period_id)
+            if not current_period:
+                return None
+
+            # Actualizar la fecha_fin
+            await self.collection.update_one(
+                {"_id": ObjectId(period_id), "user_id": ObjectId(user_id)},
+                {
+                    "$set": {
+                        "fecha_fin": fecha_fin,
+                        "updated_at": datetime.utcnow()
+                    }
+                }
+            )
+
+        # Cerrar el período
         return await self.update(
             user_id,
             period_id,

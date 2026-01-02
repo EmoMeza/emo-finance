@@ -11,6 +11,7 @@ from app.models.user import UserInDB
 from app.models.period import (
     PeriodCreate,
     PeriodUpdate,
+    PeriodCloseRequest,
     PeriodResponse,
     PeriodInDB,
     TipoPeriodo,
@@ -293,6 +294,7 @@ async def update_period(
 @router.post("/{period_id}/close", response_model=PeriodResponse)
 async def close_period(
     period_id: str,
+    close_request: Optional[PeriodCloseRequest] = None,
     current_user: UserInDB = Depends(get_current_active_user),
     db=Depends(get_database)
 ):
@@ -301,9 +303,13 @@ async def close_period(
 
     Un período cerrado se mantiene para historial y sus gastos/aportes fijos
     se copian al crear el siguiente período.
+
+    Opcionalmente se puede especificar una fecha_fin personalizada para ajustar
+    el día de cierre (útil para diferentes fechas de cierre de tarjetas de crédito).
     """
     period_crud = PeriodCRUD(db)
-    closed = await period_crud.close_period(str(current_user.id), period_id)
+    fecha_fin_custom = close_request.fecha_fin if close_request else None
+    closed = await period_crud.close_period(str(current_user.id), period_id, fecha_fin_custom)
 
     if not closed:
         raise HTTPException(

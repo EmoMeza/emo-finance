@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { Category, Expense, Aporte, TipoGasto } from '../../models';
 import { ExpenseService } from '../../services/expense.service';
 import { AporteService } from '../../services/aporte.service';
+import { PeriodService } from '../../services/period.service';
 
 type TabType = 'resumen' | 'fijos' | 'variables' | 'aportes';
 
@@ -22,12 +23,15 @@ export class CategoryDetailModalComponent implements OnInit {
   @Input() periodoFechaFin?: Date;
   @Output() close = new EventEmitter<void>();
   @Output() metaChanged = new EventEmitter<number>();
+  @Output() periodChanged = new EventEmitter<void>();
 
   activeTab = signal<TabType>('resumen');
   showAddExpenseForm = signal(false);
   showAddAporteForm = signal(false);
   editingMeta = signal(false);
   metaEditValue = signal(0);
+  editingFechaFin = signal(false);
+  fechaFinEditValue = '';
 
   // Control de edición
   editingExpenseId = signal<string | null>(null);
@@ -116,7 +120,8 @@ export class CategoryDetailModalComponent implements OnInit {
 
   constructor(
     public expenseService: ExpenseService,
-    public aporteService: AporteService
+    public aporteService: AporteService,
+    private periodService: PeriodService
   ) {}
 
   ngOnInit() {
@@ -387,6 +392,53 @@ export class CategoryDetailModalComponent implements OnInit {
 
     this.metaChanged.emit(this.metaEditValue());
     this.editingMeta.set(false);
+  }
+
+  // ==================
+  // EDITAR FECHA FIN
+  // ==================
+
+  startEditingFechaFin() {
+    // Convertir fecha actual a formato YYYY-MM-DD para el input type="date"
+    if (this.periodoFechaFin) {
+      const date = new Date(this.periodoFechaFin);
+      this.fechaFinEditValue = date.toISOString().split('T')[0];
+    }
+    this.editingFechaFin.set(true);
+  }
+
+  cancelEditingFechaFin() {
+    this.editingFechaFin.set(false);
+    this.fechaFinEditValue = '';
+  }
+
+  async saveFechaFin() {
+    if (!this.fechaFinEditValue) {
+      alert('Por favor selecciona una fecha válida');
+      return;
+    }
+
+    // Validar que la nueva fecha sea posterior a fecha_inicio
+    const nuevaFechaFin = new Date(this.fechaFinEditValue);
+    if (this.periodoFechaInicio && nuevaFechaFin <= new Date(this.periodoFechaInicio)) {
+      alert('La fecha de fin debe ser posterior a la fecha de inicio');
+      return;
+    }
+
+    try {
+      // Actualizar la fecha_fin del período
+      await this.periodService.updatePeriod(this.periodoId, {
+        fecha_fin: nuevaFechaFin
+      }).toPromise();
+
+      // Notificar al componente padre para que recargue los datos
+      this.periodChanged.emit();
+      this.editingFechaFin.set(false);
+      alert('Fecha de cierre actualizada correctamente');
+    } catch (error) {
+      console.error('Error al actualizar fecha de cierre:', error);
+      alert('Error al actualizar la fecha de cierre');
+    }
   }
 
   // ==================

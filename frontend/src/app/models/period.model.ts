@@ -48,6 +48,7 @@ export interface PeriodUpdate {
   metas_categorias?: MetasCategorias;
   estado?: EstadoPeriodo;
   total_gastado?: number;
+  fecha_fin?: Date;
 }
 
 export interface CategorySummary {
