@@ -444,7 +444,13 @@ class PeriodCRUD:
         )
 
         # Obtener crédito del período anterior
+        # Primero intentar buscar un período cerrado
         previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
+
+        # Si no hay período cerrado (caso del primer mes), usar el período activo
+        if not previous_credit_period:
+            previous_credit_period = await self.get_active(user_id, TipoPeriodo.CICLO_CREDITO)
+
         credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
 
         # Calcular liquidez inicial
