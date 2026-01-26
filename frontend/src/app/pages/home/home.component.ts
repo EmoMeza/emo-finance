@@ -315,17 +315,40 @@ export class HomeComponent implements OnInit {
     if (!category || !periodId) return;
 
     try {
-      // TODO: Implementar endpoint para actualizar meta del período
       console.log('META CHANGED:', {
         category: category.slug,
         periodId,
         newMeta
       });
 
-      // Por ahora, solo actualizar localmente y recargar
+      // Actualizar la meta de crédito en el período
+      // Solo crédito tiene meta editable
+      if (category.slug === 'credito') {
+        await this.periodService.updatePeriod(periodId, {
+          metas_categorias: {
+            credito_usable: newMeta
+          }
+        }).toPromise();
+
+        // Actualizar también el período de crédito local
+        this.creditPeriod.update(period => {
+          if (period) {
+            return {
+              ...period,
+              metas_categorias: {
+                ...period.metas_categorias,
+                credito_usable: newMeta
+              }
+            };
+          }
+          return period;
+        });
+      }
+
+      // Actualizar localmente
       this.selectedCategoryMeta.set(newMeta);
 
-      // Recargar summary
+      // Recargar summary para reflejar los cambios
       this.periodService.getPeriodSummary(periodId).subscribe({
         next: () => {
           console.log('Summary recargado después de cambiar meta');
