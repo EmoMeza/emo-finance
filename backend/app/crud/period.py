@@ -334,6 +334,40 @@ class PeriodCRUD:
 
         return PeriodInDB(**period) if period else None
 
+    async def _get_credit_period_for_liquidez(
+        self,
+        user_id: str,
+        periodo_mensual: PeriodInDB
+    ) -> Optional[PeriodInDB]:
+        """
+        Obtener el período de crédito cerrado que corresponde para calcular la liquidez
+        del período mensual dado.
+
+        Lógica: Se busca el período de crédito cerrado cuya fecha_fin sea ANTERIOR
+        a la fecha_inicio del período mensual. Esto representa la deuda de crédito
+        que se PAGA durante ese mes.
+
+        Ejemplo:
+        - Período mensual: Enero 1-31
+        - Se busca período de crédito cerrado con fecha_fin < Enero 1
+        - Encontrará: (Nov 25 - Dic 24) que terminó el 24 de diciembre
+        - Esa deuda se paga a principios de enero
+
+        El período de crédito (Dic 25 - Ene 24) que termina el 24 de enero
+        se pagará en febrero, no en enero.
+        """
+        period = await self.collection.find_one(
+            {
+                "user_id": ObjectId(user_id),
+                "tipo_periodo": TipoPeriodo.CICLO_CREDITO,
+                "estado": EstadoPeriodo.CERRADO,
+                "fecha_fin": {"$lt": periodo_mensual.fecha_inicio}
+            },
+            sort=[("fecha_fin", -1)]
+        )
+
+        return PeriodInDB(**period) if period else None
+
     async def _copy_fixed_items(
         self,
         user_id: str,
@@ -512,7 +546,8 @@ class PeriodCRUD:
         Donde:
         - total_ahorro_real = gastos_ahorro - aportes_ahorro
         - total_arriendo_real = gastos_arriendo - aportes_arriendo
-        - credito_periodo_anterior = total_gastado del período de crédito cerrado más reciente
+        - credito_periodo_anterior = total_gastado del período de crédito que se PAGA este mes
+          (período cerrado cuya fecha_fin es anterior al inicio del período mensual)
         - gastos_liquidez = gastos fijos + gastos variables de la categoría liquidez
         - aportes_liquidez = aportes a la categoría liquidez
 
@@ -532,10 +567,16 @@ class PeriodCRUD:
             categoria_arriendo_id
         )
 
-        # Obtener crédito del período anterior
-        # Buscar el período de crédito cerrado más reciente
-        previous_credit_period = await self._get_previous_period(user_id, TipoPeriodo.CICLO_CREDITO)
-        credito_anterior = previous_credit_period.total_gastado if previous_credit_period else 0.0
+        # Obtener crédito del período que se PAGA este mes
+        # Buscar el período de crédito cerrado cuya fecha_fin sea ANTERIOR al inicio del período mensual
+        credit_period_for_payment = await self._get_credit_period_for_liquidez(user_id, period)
+        credito_anterior = credit_period_for_payment.total_gastado if credit_period_for_payment else 0.0
+
+        # DEBUG: Log del período de crédito usado
+        if credit_period_for_payment:
+            print(f"DEBUG LIQUIDEZ: Usando período de crédito {credit_period_for_payment.fecha_inicio} - {credit_period_for_payment.fecha_fin} con total_gastado=${credito_anterior}")
+        else:
+            print(f"DEBUG LIQUIDEZ: No se encontró período de crédito cerrado anterior a {period.fecha_inicio}")
 
         # Calcular liquidez inicial
         liquidez_inicial = (
