@@ -171,6 +171,13 @@ export class PeriodService {
   }
 
   /**
+   * Reparar períodos activos (recalcular totales, corregir fechas)
+   */
+  repairPeriods(): Observable<any> {
+    return this.http.post<any>(`${this.API_URL}repair`, {});
+  }
+
+  /**
    * Calcular liquidez según LOGICA_SISTEMA.md
    * liquidez = sueldo - meta_ahorro - total_arriendo_real - credito_periodo_anterior
    */

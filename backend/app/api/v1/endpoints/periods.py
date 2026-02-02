@@ -1,6 +1,9 @@
 from typing import List, Optional
+from datetime import datetime
+from calendar import monthrange
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel
+from bson import ObjectId
 from app.core.database import get_database
 from app.api.dependencies import get_current_active_user
 from app.crud.period import PeriodCRUD
@@ -318,6 +321,136 @@ async def close_period(
         )
 
     return period_to_response(closed)
+
+
+class RepairResult(BaseModel):
+    """Resultado de la reparación del período mensual"""
+    repaired: bool = False
+    fechas: Optional[str] = None
+    sueldo: Optional[str] = None
+    fijos_copiados: Optional[str] = None
+    error: Optional[str] = None
+
+
+@router.post("/repair", response_model=RepairResult)
+async def repair_current_periods(
+    current_user: UserInDB = Depends(get_current_active_user),
+    db=Depends(get_database)
+):
+    """
+    Reparar el período mensual activo del usuario.
+
+    Recalcula de base el mes actual manteniendo el sueldo:
+    1. Verifica y corrige las fechas del período mensual
+    2. Recupera sueldo del período anterior si el actual está en 0
+    3. Copia gastos fijos y aportes fijos del período anterior si faltan
+       (ahorro, arriendo, etc. heredan sus fijos del mes pasado)
+
+    La liquidez se recalcula automáticamente al consultar el summary,
+    restando ahorro, arriendo y el último crédito cerrado.
+    """
+    expense_crud = ExpenseCRUD(db)
+    aporte_crud = AporteCRUD(db)
+    period_crud = PeriodCRUD(db, expense_crud=expense_crud, aporte_crud=aporte_crud)
+    user_id = str(current_user.id)
+
+    result = RepairResult()
+
+    try:
+        mensual = await period_crud.get_active(user_id, TipoPeriodo.MENSUAL_ESTANDAR)
+        if not mensual:
+            result.error = "No se encontró período mensual activo"
+            return result
+
+        mensual_id = str(mensual.id)
+
+        # 1. Corregir fechas del período
+        now = datetime.utcnow()
+        expected_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_day = monthrange(now.year, now.month)[1]
+        expected_end = now.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+        if mensual.fecha_inicio != expected_start or mensual.fecha_fin != expected_end:
+            await period_crud.collection.update_one(
+                {"_id": mensual.id, "user_id": ObjectId(user_id)},
+                {"$set": {
+                    "fecha_inicio": expected_start,
+                    "fecha_fin": expected_end,
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            result.fechas = f"Corregidas: {expected_start.date()} - {expected_end.date()}"
+        else:
+            result.fechas = f"OK: {mensual.fecha_inicio.date()} - {mensual.fecha_fin.date()}"
+
+        # 2. Recuperar sueldo del período anterior si el actual es 0
+        previous = await period_crud._get_previous_period(user_id, TipoPeriodo.MENSUAL_ESTANDAR)
+
+        if mensual.sueldo == 0 and previous and previous.sueldo > 0:
+            await period_crud.collection.update_one(
+                {"_id": mensual.id, "user_id": ObjectId(user_id)},
+                {"$set": {
+                    "sueldo": previous.sueldo,
+                    "metas_categorias": previous.metas_categorias.model_dump(),
+                    "updated_at": datetime.utcnow()
+                }}
+            )
+            result.sueldo = f"Recuperado: ${previous.sueldo:,.0f}"
+        elif mensual.sueldo > 0:
+            result.sueldo = f"OK: ${mensual.sueldo:,.0f}"
+        else:
+            result.sueldo = "Sin sueldo configurado"
+
+        # 3. Copiar gastos fijos y aportes fijos del período anterior si faltan
+        if previous:
+            previous_id = str(previous.id)
+            gastos_copiados = 0
+            aportes_copiados = 0
+
+            # Contar gastos fijos del período actual
+            gastos_fijos_count = len(await expense_crud.get_fijos_permanentes(user_id, mensual_id))
+            gastos_fijos_count += len(await expense_crud.get_fijos_temporales_activos(user_id, mensual_id))
+
+            # Si no hay fijos en el actual pero sí en el anterior, copiarlos
+            prev_fijos_perm = await expense_crud.get_fijos_permanentes(user_id, previous_id)
+            prev_fijos_temp = await expense_crud.get_fijos_temporales_activos(user_id, previous_id)
+            prev_aportes_fijos = await aporte_crud.get_fijos(user_id, previous_id)
+
+            if gastos_fijos_count == 0 and (len(prev_fijos_perm) > 0 or len(prev_fijos_temp) > 0):
+                # Copiar gastos fijos del período anterior
+                await period_crud._copy_fixed_items(user_id, previous, mensual)
+                gastos_copiados = len(prev_fijos_perm) + len(prev_fijos_temp)
+                aportes_copiados = len(prev_aportes_fijos)
+            else:
+                # Verificar aportes fijos por separado
+                aportes_fijos_count = len(await aporte_crud.get_fijos(user_id, mensual_id))
+                if aportes_fijos_count == 0 and len(prev_aportes_fijos) > 0:
+                    # Solo copiar aportes fijos
+                    from app.models.aporte import AporteCreate
+                    for aporte in prev_aportes_fijos:
+                        aporte_create = AporteCreate(
+                            nombre=aporte.nombre,
+                            monto=aporte.monto,
+                            categoria_id=aporte.categoria_id,
+                            es_fijo=True,
+                            descripcion=aporte.descripcion
+                        )
+                        await aporte_crud.create(user_id, mensual_id, aporte_create)
+                        aportes_copiados += 1
+
+            if gastos_copiados > 0 or aportes_copiados > 0:
+                result.fijos_copiados = f"{gastos_copiados} gastos fijos + {aportes_copiados} aportes fijos copiados"
+            else:
+                result.fijos_copiados = "OK: fijos ya presentes"
+        else:
+            result.fijos_copiados = "Sin período anterior"
+
+        result.repaired = True
+
+    except Exception as e:
+        result.error = f"Error: {str(e)}"
+
+    return result
 
 
 @router.delete("/{period_id}", status_code=status.HTTP_204_NO_CONTENT)

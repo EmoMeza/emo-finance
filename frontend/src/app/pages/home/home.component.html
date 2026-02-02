@@ -27,10 +27,15 @@
           <button class="btn-config" (click)="openInitialSetupModal()">Configurar</button>
         </div>
       } @else {
-        <button class="btn-edit" (click)="openEditSueldoModal()">
-          <span>✏️</span>
-          Editar Sueldo
-        </button>
+        <div class="header-actions">
+          <button class="btn-edit" (click)="openEditSueldoModal()">
+            <span>✏️</span>
+            Editar Sueldo
+          </button>
+          <button class="btn-repair" (click)="repairPeriods()" [disabled]="isRepairing()">
+            {{ isRepairing() ? 'Reparando...' : 'Recalcular Mes' }}
+          </button>
+        </div>
       }
     </div>
 

@@ -91,6 +91,37 @@
   transform: translateY(-2px);
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.btn-repair {
+  padding: 0.75rem 1.25rem;
+  background: #f0fdf4;
+  border: 2px solid #86efac;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  color: #166534;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.85rem;
+}
+
+.btn-repair:hover {
+  border-color: #16a34a;
+  background: #dcfce7;
+  transform: translateY(-2px);
+}
+
+.btn-repair:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Loading State */
 .loading-container,
 .error-container,

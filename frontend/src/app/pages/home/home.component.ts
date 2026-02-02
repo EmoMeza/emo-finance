@@ -26,6 +26,7 @@ export class HomeComponent implements OnInit {
   showEditSueldoModal = signal(false);
   editSueldoValue = signal(0);
   showQuickAddModal = signal(false);
+  isRepairing = signal(false);
 
   // Form para agregar gasto/aporte rápido
   quickAddForm = {
@@ -434,6 +435,36 @@ export class HomeComponent implements OnInit {
         new Date(period.fecha_inicio),
         new Date(period.fecha_fin)
       );
+    }
+  }
+
+  // ==================
+  // REPAIR PERIODS
+  // ==================
+
+  async repairPeriods() {
+    this.isRepairing.set(true);
+    try {
+      const result = await this.periodService.repairPeriods().toPromise();
+      console.log('Repair result:', result);
+
+      // Recargar todo el dashboard
+      await this.loadDashboardData();
+
+      const lines = [
+        `Fechas: ${result.fechas || 'OK'}`,
+        `Sueldo: ${result.sueldo || 'OK'}`,
+        `Fijos: ${result.fijos_copiados || 'OK'}`
+      ];
+      if (result.error) {
+        lines.push(`Error: ${result.error}`);
+      }
+      alert(`Recalculo completado:\n${lines.join('\n')}`);
+    } catch (error) {
+      console.error('Error repairing periods:', error);
+      alert('Error al reparar los periodos');
+    } finally {
+      this.isRepairing.set(false);
     }
   }
 

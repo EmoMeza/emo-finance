@@ -74,6 +74,7 @@ class PeriodCRUD:
 
         Si no existe, lo crea automáticamente.
         Si existe pero está vencido (fecha_fin < ahora), lo cierra automáticamente y crea uno nuevo.
+        Si se saltaron períodos intermedios, los crea como cerrados para mantener historial.
         """
         period = await self.collection.find_one({
             "user_id": ObjectId(user_id),
@@ -88,7 +89,17 @@ class PeriodCRUD:
             # Auto-cerrar si el período está vencido
             if current_time > period_obj.fecha_fin:
                 print(f"🔄 AUTO-CLOSE: Período {tipo_periodo.value} expirado, cerrando...")
+
+                # Recalcular total_gastado antes de cerrar (para períodos de crédito)
+                if tipo_periodo == TipoPeriodo.CICLO_CREDITO and self.expense_crud:
+                    await self.update_total_gastado(user_id, str(period_obj.id))
+                    print(f"   💰 total_gastado recalculado antes de cerrar")
+
                 await self.close_period(user_id, str(period_obj.id))
+
+                # Crear períodos intermedios saltados si es necesario
+                await self._create_skipped_periods(user_id, tipo_periodo, period_obj.fecha_fin, current_time)
+
                 print(f"✨ AUTO-CREATE: Creando nuevo período {tipo_periodo.value}...")
                 return await self._create_current_period(user_id, tipo_periodo)
 
@@ -243,6 +254,112 @@ class PeriodCRUD:
     # LÓGICA DE CREACIÓN AUTOMÁTICA
     # ====================
 
+    async def _create_skipped_periods(
+        self,
+        user_id: str,
+        tipo_periodo: TipoPeriodo,
+        last_fecha_fin: datetime,
+        current_time: datetime
+    ):
+        """
+        Crear períodos intermedios cerrados cuando el usuario no entró durante uno o más períodos.
+
+        Ejemplo: Si el último período fue enero (fecha_fin=Jan 31) y hoy es marzo 15,
+        se crea un período cerrado para febrero (Feb 1-28) para que no haya un vacío
+        en el historial y la copia de gastos fijos funcione correctamente.
+        """
+        if tipo_periodo == TipoPeriodo.MENSUAL_ESTANDAR:
+            # Calcular cuántos meses se saltaron
+            # Siguiente mes después del período cerrado
+            next_date = last_fecha_fin + timedelta(days=1)
+            current_period_start = current_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            while True:
+                skip_start = next_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                last_day = monthrange(skip_start.year, skip_start.month)[1]
+                skip_end = skip_start.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+                # Si este período ya es el mes actual, no crear (se creará como ACTIVO)
+                if skip_start >= current_period_start:
+                    break
+
+                print(f"   📅 Creando período mensual saltado: {skip_start} - {skip_end}")
+
+                # Obtener el período cerrado más reciente para copiar datos
+                previous = await self._get_previous_period(user_id, tipo_periodo)
+
+                period_dict = {
+                    "user_id": ObjectId(user_id),
+                    "tipo_periodo": tipo_periodo,
+                    "fecha_inicio": skip_start,
+                    "fecha_fin": skip_end,
+                    "sueldo": previous.sueldo if previous else 0,
+                    "metas_categorias": previous.metas_categorias.model_dump() if previous else MetasCategorias().model_dump(),
+                    "estado": EstadoPeriodo.CERRADO,
+                    "categorias": previous.categorias if previous and hasattr(previous, 'categorias') and previous.categorias else await self._get_user_categories(user_id),
+                    "total_gastado": 0,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+
+                result = await self.collection.insert_one(period_dict)
+                period_dict["_id"] = result.inserted_id
+                skipped_period = PeriodInDB(**period_dict)
+
+                # Copiar gastos fijos al período saltado
+                if previous and self.expense_crud and self.aporte_crud:
+                    await self._copy_fixed_items(user_id, previous, skipped_period)
+
+                # Avanzar al siguiente mes
+                if skip_start.month == 12:
+                    next_date = skip_start.replace(year=skip_start.year + 1, month=1, day=1)
+                else:
+                    next_date = skip_start.replace(month=skip_start.month + 1, day=1)
+
+        elif tipo_periodo == TipoPeriodo.CICLO_CREDITO:
+            # Para crédito, crear períodos saltados del 25 al 24
+            next_date = last_fecha_fin + timedelta(days=1)
+
+            while True:
+                skip_start, skip_end = self._calculate_credito_dates(next_date)
+
+                # Si este período contiene la fecha actual, no crear (se creará como ACTIVO)
+                if skip_start <= current_time <= skip_end:
+                    break
+                # Si ya pasamos la fecha actual, parar
+                if skip_start > current_time:
+                    break
+
+                print(f"   📅 Creando período de crédito saltado: {skip_start} - {skip_end}")
+
+                previous = await self._get_previous_period(user_id, tipo_periodo)
+
+                period_dict = {
+                    "user_id": ObjectId(user_id),
+                    "tipo_periodo": tipo_periodo,
+                    "fecha_inicio": skip_start,
+                    "fecha_fin": skip_end,
+                    "sueldo": 0,
+                    "metas_categorias": previous.metas_categorias.model_dump() if previous else MetasCategorias().model_dump(),
+                    "estado": EstadoPeriodo.CERRADO,
+                    "categorias": previous.categorias if previous and hasattr(previous, 'categorias') and previous.categorias else await self._get_user_categories(user_id),
+                    "total_gastado": 0,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+
+                result = await self.collection.insert_one(period_dict)
+                period_dict["_id"] = result.inserted_id
+                skipped_period = PeriodInDB(**period_dict)
+
+                # Copiar gastos fijos y actualizar total_gastado
+                if previous and self.expense_crud and self.aporte_crud:
+                    await self._copy_fixed_items(user_id, previous, skipped_period)
+                    await self.update_total_gastado(user_id, str(skipped_period.id))
+
+                # Avanzar al siguiente ciclo de crédito (~30 días)
+                next_date = skip_end + timedelta(days=1)
+
     async def _get_user_categories(self, user_id: str) -> List[ObjectId]:
         """
         Obtener los IDs de las 4 categorías del usuario
@@ -312,6 +429,11 @@ class PeriodCRUD:
         # Copiar gastos fijos y aportes fijos del período anterior
         if previous_period and self.expense_crud and self.aporte_crud:
             await self._copy_fixed_items(user_id, previous_period, new_period)
+
+            # Actualizar total_gastado del nuevo período de crédito después de copiar gastos
+            if tipo_periodo == TipoPeriodo.CICLO_CREDITO:
+                await self.update_total_gastado(user_id, str(new_period.id))
+                print(f"   💰 total_gastado actualizado después de copiar gastos fijos al nuevo período de crédito")
 
         return new_period
 
